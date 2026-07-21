@@ -43,12 +43,26 @@
   <div class="setup-inner">
     <div class="setup-head">
       <svg viewBox="0 0 48 48" class="logo big" aria-hidden="true">
-        <circle cx="24" cy="18" r="9" fill="#e8641b"/>
-        <rect x="8" y="31" width="32" height="4.5" rx="2.25" fill="#e8641b"/>
-        <rect x="14" y="39" width="20" height="4.5" rx="2.25" fill="#e8641b"/>
+        <circle cx="24" cy="18" r="9" fill="var(--accent)"/>
+        <rect x="8" y="31" width="32" height="4.5" rx="2.25" fill="var(--accent)"/>
+        <rect x="14" y="39" width="20" height="4.5" rx="2.25" fill="var(--accent)"/>
       </svg>
       <h2 id="setup-title">Welcome to My News</h2>
       <p id="setup-blurb">Tap the topics you care about, add your own keywords, and get a news feed that's yours. Free, no sign-up, saved on your phone.</p>
+    </div>
+
+    <h3>Your name <span class="optional">(optional)</span></h3>
+    <p class="hint">So the app can say g'day properly.</p>
+    <div class="kw-row">
+      <input id="name-input" type="text" placeholder="e.g. Watty" autocomplete="off" maxlength="30">
+    </div>
+
+    <h3>Make it yours</h3>
+    <p class="hint">Pick a colour theme, or use one of your own photos as the background.</p>
+    <div id="theme-row" class="theme-row"></div>
+    <div class="kw-row photo-row">
+      <label class="small-btn file-btn">📷 Use my photo<input id="bg-input" type="file" accept="image/*" hidden></label>
+      <button id="bg-remove" class="small-btn ghost" hidden>Remove photo</button>
     </div>
 
     <h3>Pick your topics</h3>
@@ -73,6 +87,18 @@
       <button id="mute-add" class="small-btn">Add</button>
     </div>
     <div id="mute-chips" class="chip-grid"></div>
+
+    <h3>Reading voice</h3>
+    <p class="hint">Used by the 🔊 "read it to me" button. Voices come from your device.</p>
+    <div class="kw-row">
+      <select id="voice-sel"><option value="">Auto (device default)</option></select>
+      <select id="rate-sel">
+        <option value="0.9">Slower</option>
+        <option value="1" selected>Normal</option>
+        <option value="1.15">Faster</option>
+      </select>
+    </div>
+    <button id="voice-test" class="small-btn ghost">▶ Test the voice</button>
 
     <button id="btn-done" class="cta">Show me my news</button>
   </div>

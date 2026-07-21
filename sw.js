@@ -1,6 +1,6 @@
 // Minimal service worker: cache the app shell so it opens fast.
 // News itself is always fetched live.
-const SHELL = "mynews-shell-v1";
+const SHELL = "mynews-shell-v2";
 const FILES = ["./", "index.html", "style.css", "app.js", "manifest.webmanifest", "icon-192.png"];
 
 self.addEventListener("install", (e) => {
