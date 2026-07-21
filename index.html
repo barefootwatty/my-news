@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My News — your news, your way</title>
+<meta name="description" content="Pick your interests and keywords, get your own free daily news feed. No accounts, no cost.">
+<meta name="theme-color" content="#e8641b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My News">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header id="topbar" hidden>
+  <div class="brand">
+    <svg viewBox="0 0 48 48" class="logo" aria-hidden="true">
+      <circle cx="24" cy="18" r="9" fill="#fff"/>
+      <rect x="8" y="31" width="32" height="4.5" rx="2.25" fill="#fff"/>
+      <rect x="14" y="39" width="20" height="4.5" rx="2.25" fill="#fff"/>
+    </svg>
+    <div>
+      <h1>My News</h1>
+      <p class="tagline">Your news, your way</p>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="btn-listen" title="Read it to me" aria-label="Read the headlines aloud">🔊</button>
+    <button id="btn-refresh" title="Refresh" aria-label="Refresh the news">↻</button>
+    <button id="btn-share" title="Share this app" aria-label="Share this app">📤</button>
+    <button id="btn-settings" title="Settings" aria-label="Settings">⚙️</button>
+  </div>
+</header>
+
+<!-- Welcome / settings screen -->
+<section id="setup" hidden>
+  <div class="setup-inner">
+    <div class="setup-head">
+      <svg viewBox="0 0 48 48" class="logo big" aria-hidden="true">
+        <circle cx="24" cy="18" r="9" fill="#e8641b"/>
+        <rect x="8" y="31" width="32" height="4.5" rx="2.25" fill="#e8641b"/>
+        <rect x="14" y="39" width="20" height="4.5" rx="2.25" fill="#e8641b"/>
+      </svg>
+      <h2 id="setup-title">Welcome to My News</h2>
+      <p id="setup-blurb">Tap the topics you care about, add your own keywords, and get a news feed that's yours. Free, no sign-up, saved on your phone.</p>
+    </div>
+
+    <h3>Pick your topics</h3>
+    <div id="preset-grid" class="chip-grid"></div>
+
+    <h3>Add your own keywords</h3>
+    <p class="hint">Anything you like — a town, a team, a fish, a hobby. Press Add after each one.</p>
+    <div class="kw-row">
+      <input id="kw-input" type="text" placeholder="e.g. barramundi" autocomplete="off" enterkeyhint="done">
+      <button id="kw-add" class="small-btn">Add</button>
+    </div>
+    <div id="custom-chips" class="chip-grid"></div>
+
+    <h3>Skip the grim stuff <span class="optional">(optional)</span></h3>
+    <p class="hint">Hide stories whose headline mentions any of these words.</p>
+    <label class="toggle-row">
+      <input type="checkbox" id="mute-on">
+      <span>Hide stories with my blocked words</span>
+    </label>
+    <div class="kw-row">
+      <input id="mute-input" type="text" placeholder="e.g. crash" autocomplete="off" enterkeyhint="done">
+      <button id="mute-add" class="small-btn">Add</button>
+    </div>
+    <div id="mute-chips" class="chip-grid"></div>
+
+    <button id="btn-done" class="cta">Show me my news</button>
+  </div>
+</section>
+
+<!-- The feed -->
+<main id="feed" hidden></main>
+
+<footer id="foot" hidden>
+  <p>My News — free news from Google News Australia. Your picks stay on your device.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

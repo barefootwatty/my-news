@@ -1,0 +1,13 @@
+{
+  "name": "My News",
+  "short_name": "My News",
+  "description": "Pick your topics and keywords, get your own free news feed.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fff8f0",
+  "theme_color": "#e8641b",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
