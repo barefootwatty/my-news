@@ -87,7 +87,7 @@ module.exports = async (req, res) => {
       });
       finalUrl = ar.url || artUrl;
       const html = (await ar.text()).slice(0, 400000);
-      image = pickMeta(html, "og:image") || pickMeta(html, "twitter:image");
+      image = unescapeEntities(pickMeta(html, "og:image") || pickMeta(html, "twitter:image"));
       summary =
         pickMeta(html, "og:description") ||
         pickMeta(html, "description") ||
