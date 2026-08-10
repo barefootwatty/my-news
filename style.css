@@ -195,6 +195,50 @@ body.has-photo .section h2 {
   padding-right: 12px;
 }
 
+/* Each story = .cardwrap holding the swipe layers + the .card on top */
+.cardwrap {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 9px;
+  transition: height .3s ease, margin .3s ease, opacity .3s ease;
+}
+.cardwrap.gone { height: 0 !important; margin-bottom: 0; opacity: 0; }
+
+.under {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius);
+}
+.under-left {
+  background: #c62828;
+  color: #fff;
+  justify-content: flex-end;
+  padding-right: 20px;
+  font-weight: 700;
+}
+.under-right {
+  background: color-mix(in srgb, var(--accent) 14%, var(--card));
+  justify-content: flex-start;
+  gap: 8px;
+  padding-left: 10px;
+}
+.under-right button {
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: .78rem;
+  font-weight: 600;
+  padding: 10px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.under-right .less-btn { background: var(--ink-soft); }
+
 .card {
   display: flex;
   gap: 12px;
@@ -203,7 +247,9 @@ body.has-photo .section h2 {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 13px 15px;
-  margin-bottom: 9px;
+  position: relative;
+  z-index: 1;
+  touch-action: pan-y;
   text-decoration: none;
   color: var(--ink);
 }
@@ -252,6 +298,48 @@ body.has-photo .card { background: color-mix(in srgb, var(--card) 94%, transpare
   animation: shimmer 1.2s infinite;
 }
 @keyframes shimmer { to { background-position: -200% 0; } }
+
+.swipe-tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  margin-bottom: 16px;
+  font-size: .85rem;
+}
+.swipe-tip button {
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  flex: none;
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--ink);
+  color: var(--bg);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: .88rem;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, transform .25s;
+  z-index: 50;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25);
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 #foot { text-align: center; color: var(--ink-soft); font-size: .75rem; padding: 0 20px 40px; }
 body.has-photo #foot p {

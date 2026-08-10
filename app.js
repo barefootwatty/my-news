@@ -3,17 +3,29 @@
 const STORE_KEY = "mynews.settings.v1";
 const PHOTO_KEY = "mynews.bgphoto.v1"; // stored separately: photos are big
 
+/* Each preset has a Google News query, and optionally `match`: words that must
+   appear in the headline (word-start match, so "fish" also catches "fishing").
+   Google pads searches with loosely "related" stories — `match` weeds them out. */
 const PRESETS = [
-  { id: "nt",       label: "Top End & NT",    query: '"Northern Territory" OR "Top End" OR (Darwin Australia)' },
-  { id: "fishing",  label: "Fishing",         query: "fishing Australia" },
-  { id: "flyfish",  label: "Fly Fishing",     query: '"fly fishing"' },
-  { id: "boating",  label: "Boating",         query: "boating Australia" },
-  { id: "weather",  label: "Weather",         query: "weather Australia BOM" },
+  { id: "nt",       label: "Top End & NT",    query: '"Northern Territory" OR "Top End" OR (Darwin Australia)',
+    match: ["northern territory", "top end", "territor", "darwin", "kakadu", "katherine", "arnhem", "litchfield", "tiwi", "nhulunbuy", "palmerston", "daly river", "alice springs"] },
+  { id: "fishing",  label: "Fishing",         query: "fishing Australia",
+    match: ["fish", "angl", "barra", "tackle", "lure", "reel", "crab", "prawn", "snapper", "jetty", "estuary"] },
+  // saltwater fly news is scarce (often none for a week), so the section keeps
+  // all real fly-fishing stories but `prefer` floats saltwater ones to the top
+  { id: "flyfish",  label: "Fly Fishing",     query: '"saltwater fly fishing" OR "fly fishing" OR flyfishing', days: 7,
+    match: ["fly fish", "fly-fish", "flyfish"],
+    prefer: ["saltwater", "salt water", "bonefish", "tarpon", "trevally", "queenfish", "barramundi", "permit", "milkfish", "flats", "estuary", "giant herring"] },
+  { id: "boating",  label: "Boating",         query: "boating Australia",
+    match: ["boat", "marine", "yacht", "vessel", "sail", "ferry", "harbour", "tinnie", "skipper"] },
+  { id: "weather",  label: "Weather",         query: "weather Australia BOM",
+    match: ["weather", "forecast", "cyclone", "storm", "rain", "flood", "heat", "monsoon", "temperature", "wind", "wet season"] },
   { id: "goodnews", label: "Good News",       query: '"good news" Australia' },
   { id: "afl",      label: "AFL Footy",       query: "AFL football" },
   { id: "nrl",      label: "Rugby League",    query: "NRL rugby league" },
   { id: "cricket",  label: "Cricket",         query: "cricket Australia" },
-  { id: "travel",   label: "Travel & Tourism",query: "travel tourism Australia" },
+  { id: "travel",   label: "Travel & Tourism",query: "travel tourism Australia",
+    match: ["travel", "touris", "holiday", "flight", "airline", "cruise", "resort", "airport", "destination"] },
   { id: "money",    label: "Money & Business",query: "business economy Australia" },
   { id: "world",    label: "World News",      query: "world news" },
 ];
@@ -36,6 +48,10 @@ const DEFAULTS = {
   theme: "sunset",
   voiceURI: "",
   rate: 1,
+  hiddenKeys: [],   // stories swiped away — never shown again
+  boosts: [],       // words from "more like this" headlines — float similar stories up
+  brakes: [],       // words from "less like this" headlines — sink or skip similar stories
+  swipeTipSeen: false,
 };
 
 let settings = load();
@@ -267,13 +283,77 @@ function chosenVoice() {
 function activeSections() {
   const sections = [];
   for (const p of PRESETS) {
-    if (settings.presetIds.includes(p.id)) sections.push({ label: p.label, query: p.query, days: 2 });
+    if (settings.presetIds.includes(p.id)) sections.push({ label: p.label, query: p.query, match: p.match, prefer: p.prefer, days: p.days || 2 });
   }
   for (const kw of settings.customKeywords) {
+    // multi-word keywords are searched as an exact phrase — much more on-topic
+    const query = /\s/.test(kw) && !/["|()]/.test(kw) ? '"' + kw + '"' : kw;
     // niche keywords get a wider window so the section isn't empty
-    sections.push({ label: kw, query: kw, days: 7 });
+    sections.push({ label: kw, query, match: keywordTerms(kw), days: 7 });
   }
   return sections;
+}
+
+/* ---------- relevance: is a headline actually about the topic? ---------- */
+
+const STOP = new Set(("the and for with from that this have will your says said say new all out its " +
+  "after over into been were their they them then than there here about when what where which just " +
+  "amid near could would should also being because before while under against between during off on " +
+  "australia australian aussie news live update updates today year years week day days more most").split(" "));
+
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+/* Word-start match: "fish" hits "fishing" and "fishers" but not "catfish". */
+function titleHas(title, terms) {
+  const t = title.toLowerCase();
+  return terms.some((term) => new RegExp("\\b" + escapeRe(term)).test(t));
+}
+function hitCount(title, words) {
+  const t = title.toLowerCase();
+  let n = 0;
+  for (const w of words) if (new RegExp("\\b" + escapeRe(w)).test(t)) n++;
+  return n;
+}
+
+/* The meaningful words of a headline or keyword (for matching + more/less). */
+function sigWords(s) {
+  return [...new Set(
+    s.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/)
+      .filter((w) => w.length >= 4 && !STOP.has(w))
+  )].slice(0, 6);
+}
+function keywordTerms(kw) {
+  const words = sigWords(kw);
+  return words.length ? words : [kw.toLowerCase()];
+}
+
+function keyOf(title) {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/* Words that define the user's chosen topics — never learned as more/less
+   signals, or one 👎 on a Darwin story could sink the whole NT section. */
+function protectedTerms() {
+  const terms = [];
+  for (const s of activeSections()) {
+    if (s.match) terms.push(...s.match);
+    if (s.prefer) terms.push(...s.prefer);
+  }
+  return terms;
+}
+function learnWords(title) {
+  const prot = protectedTerms();
+  return sigWords(title).filter((w) => !prot.some((t) => w.startsWith(t) || t.startsWith(w)));
+}
+
+/* Remember a list of words, newest last, capped so localStorage stays tiny. */
+function remember(list, words, cap) {
+  for (const w of words) {
+    const i = list.indexOf(w);
+    if (i >= 0) list.splice(i, 1);
+    list.push(w);
+  }
+  while (list.length > cap) list.shift();
 }
 
 function greeting() {
@@ -302,6 +382,17 @@ async function buildFeed() {
     return;
   }
 
+  if (!settings.swipeTipSeen) {
+    const tip = document.createElement("div");
+    tip.className = "swipe-tip";
+    tip.innerHTML = '<span>Tip: swipe a story <b>left</b> to remove it, or <b>right</b> to say "more like this" or "less like this".</span>';
+    const ok = document.createElement("button");
+    ok.textContent = "Got it";
+    ok.onclick = () => { settings.swipeTipSeen = true; save(); tip.remove(); };
+    tip.appendChild(ok);
+    feed.appendChild(tip);
+  }
+
   const seenGlobal = new Set();
   const blocks = sections.map((s) => {
     const div = document.createElement("div");
@@ -314,7 +405,7 @@ async function buildFeed() {
   await Promise.all(sections.map(async (s, i) => {
     try {
       const items = await fetchSection(s.query, s.days);
-      renderSection(blocks[i], s.label, items, seenGlobal);
+      renderSection(blocks[i], s, items, seenGlobal);
     } catch (e) {
       blocks[i].innerHTML = `<h2>${escapeHtml(s.label)}</h2><div class="error">Couldn't load this topic right now — tap ↻ in a minute.</div>`;
     }
@@ -343,37 +434,163 @@ async function fetchSection(query, days) {
   return items;
 }
 
-function renderSection(block, label, items, seenGlobal) {
+function renderSection(block, section, items, seenGlobal) {
   const muted = settings.muteOn ? settings.muteWords.map((w) => w.toLowerCase()) : [];
+  const hidden = new Set(settings.hiddenKeys);
   const kept = [];
   for (const it of items) {
-    const key = it.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const key = keyOf(it.title);
     if (seenGlobal.has(key)) continue;
+    if (hidden.has(key)) continue;
     if (muted.some((w) => it.title.toLowerCase().includes(w))) continue;
+    // the headline must actually mention the topic — Google pads with "related" stories
+    if (section.match && section.match.length && !titleHas(it.title, section.match)) continue;
+    const brake = hitCount(it.title, settings.brakes);
+    if (brake >= 2) continue; // clearly the kind of story they said "less of"
     seenGlobal.add(key);
-    kept.push(it);
-    if (kept.length >= 8) break;
+    // `prefer` terms (e.g. saltwater signals in the fly-fishing topic) outrank everything
+    const preferred = section.prefer && titleHas(it.title, section.prefer) ? 3 : 0;
+    kept.push({ ...it, score: preferred + hitCount(it.title, settings.boosts) - brake });
+    if (kept.length >= 20) break;
   }
-  latestBySection[label] = kept;
+  kept.sort((a, b) => b.score - a.score || (b.date || 0) - (a.date || 0));
+  const show = kept.slice(0, 8);
+  latestBySection[section.label] = show;
 
-  block.innerHTML = `<h2>${escapeHtml(label)}</h2>`;
-  if (kept.length === 0) {
-    block.innerHTML += '<div class="empty">Nothing fresh on this one right now.</div>';
+  block.innerHTML = `<h2>${escapeHtml(section.label)}</h2>`;
+  if (show.length === 0) {
+    block.innerHTML += '<div class="empty">Nothing on this topic right now.</div>';
     return;
   }
-  for (const it of kept) {
-    const a = document.createElement("a");
-    a.className = "card";
-    a.href = it.link;
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.dataset.gnlink = it.link;
-    a.innerHTML = `<div class="txt">
-        <div class="headline">${escapeHtml(it.title)}</div>
-        <div class="meta"><span class="src">${escapeHtml(it.src || "News")}</span> · ${relTime(it.date)}</div>
-      </div>`;
-    block.appendChild(a);
+  for (const it of show) block.appendChild(makeCard(it));
+}
+
+/* ---------- cards + swipe (left = remove, right = more/less) ---------- */
+
+let openWrap = null; // the card currently slid open, if any
+
+function closeOpen() {
+  if (!openWrap) return;
+  const card = openWrap.querySelector(".card");
+  if (card) { card.style.transition = "transform .18s ease"; card.style.transform = ""; }
+  openWrap = null;
+}
+
+function makeCard(it) {
+  const wrap = document.createElement("div");
+  wrap.className = "cardwrap";
+  wrap.innerHTML = `
+    <div class="under under-left" aria-hidden="true"><span>Remove ✕</span></div>
+    <div class="under under-right">
+      <button class="more-btn">👍 More like this</button>
+      <button class="less-btn">👎 Less like this</button>
+    </div>`;
+
+  const a = document.createElement("a");
+  a.className = "card";
+  a.href = it.link;
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.dataset.gnlink = it.link;
+  a.innerHTML = `<div class="txt">
+      <div class="headline">${escapeHtml(it.title)}</div>
+      <div class="meta"><span class="src">${escapeHtml(it.src || "News")}</span> · ${relTime(it.date)}</div>
+    </div>`;
+  wrap.appendChild(a);
+
+  wrap.querySelector(".more-btn").onclick = () => {
+    remember(settings.boosts, learnWords(it.title), 100);
+    save();
+    closeOpen();
+    toast("👍 Got it — more like this");
+  };
+  wrap.querySelector(".less-btn").onclick = () => {
+    remember(settings.brakes, learnWords(it.title), 100);
+    save();
+    removeStory(wrap, it);
+    toast("👎 Noted — less like this");
+  };
+
+  attachSwipe(wrap, a, it);
+  return wrap;
+}
+
+function attachSwipe(wrap, card, it) {
+  const REVEAL = 150; // px the card slides right to show the more/less buttons
+  let startX = 0, startY = 0, dx = 0, active = false, horiz = null, moved = false, wasOpen = false;
+
+  const setX = (x, anim) => {
+    card.style.transition = anim ? "transform .18s ease" : "none";
+    card.style.transform = x ? `translateX(${x}px)` : "";
+  };
+
+  card.addEventListener("pointerdown", (e) => {
+    if (e.button) return;
+    startX = e.clientX; startY = e.clientY;
+    dx = 0; horiz = null; active = true; moved = false;
+    wasOpen = openWrap === wrap;
+    if (openWrap && openWrap !== wrap) closeOpen();
+  });
+  card.addEventListener("pointermove", (e) => {
+    if (!active) return;
+    const mx = e.clientX - startX, my = e.clientY - startY;
+    if (horiz === null && (Math.abs(mx) > 8 || Math.abs(my) > 8)) horiz = Math.abs(mx) > Math.abs(my);
+    if (horiz === false) { active = false; return; } // it's a scroll — let the browser have it
+    if (horiz) {
+      try { card.setPointerCapture(e.pointerId); } catch (err) {}
+      moved = true;
+      dx = Math.max(-160, Math.min(REVEAL + 20, mx + (wasOpen ? REVEAL : 0)));
+      setX(dx, false);
+    }
+  });
+  const finish = () => {
+    if (!active) return;
+    active = false;
+    if (dx < -70) {
+      removeStory(wrap, it);
+      toast("Story hidden");
+    } else if (dx > 70) {
+      setX(REVEAL, true);
+      openWrap = wrap;
+    } else {
+      setX(0, true);
+      if (openWrap === wrap) openWrap = null;
+    }
+    dx = 0;
+  };
+  card.addEventListener("pointerup", finish);
+  card.addEventListener("pointercancel", () => { active = false; dx = 0; setX(0, true); if (openWrap === wrap) openWrap = null; });
+  card.addEventListener("click", (e) => {
+    // a swipe or a tap on an open card shouldn't open the article
+    if (moved || wasOpen) { e.preventDefault(); if (wasOpen && !moved) closeOpen(); }
+  });
+}
+
+function removeStory(wrap, it) {
+  remember(settings.hiddenKeys, [keyOf(it.title)], 500);
+  save();
+  if (openWrap === wrap) openWrap = null;
+  for (const arr of Object.values(latestBySection)) {
+    const i = arr.indexOf(it);
+    if (i >= 0) arr.splice(i, 1);
   }
+  wrap.style.height = wrap.offsetHeight + "px";
+  requestAnimationFrame(() => wrap.classList.add("gone"));
+  setTimeout(() => wrap.remove(), 380);
+}
+
+let toastTimer = null;
+function toast(msg) {
+  let el = $("toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 1800);
 }
 
 /* Progressively add pictures + opening lines to the cards.
@@ -534,6 +751,14 @@ $("btn-done").onclick = () => {
   settings.onboarded = true;
   save();
   showFeed();
+};
+
+$("swipe-reset").onclick = () => {
+  settings.hiddenKeys = [];
+  settings.boosts = [];
+  settings.brakes = [];
+  save();
+  toast("Swipe training cleared — fresh start");
 };
 
 $("btn-settings").onclick = () => showSetup(true);

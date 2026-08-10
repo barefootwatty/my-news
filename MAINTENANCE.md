@@ -69,10 +69,26 @@ redirect page). This is the same approach as the open-source
 
 - Topics: `PRESETS` in `app.js` (label + Google News query). NT query is tuned
   to avoid people named Darwin: `"Northern Territory" OR "Top End" OR (Darwin Australia)`.
+- **Relevance (added 10 Aug 2026):** Google News search results are shockingly
+  loose (a `"fly fishing"` search returns NBA and deer-hunting stories), so each
+  preset can carry `match` — words that must appear in the headline (word-start
+  match, so "fish" also hits "fishing") — and optional `prefer` — words that
+  float a story to the top (used to put saltwater fly stories first). Custom
+  keywords are searched as a quoted phrase and matched against their own
+  significant words. If a section goes empty too often, loosen its `match` list.
+- **Swipe (added 10 Aug 2026):** swipe left = remove story (key stored in
+  `settings.hiddenKeys`, cap 500); swipe right reveals 👍/👎. 👍 stores headline
+  words in `boosts` (sorted up), 👎 in `brakes` (sorted down; 2+ hits = skipped).
+  Caps 100 each. Words matching an active topic's `match`/`prefer` terms are
+  never learned (`protectedTerms()`), so a 👎 on one Darwin story can't sink the
+  NT section. "Start the learning fresh" in settings clears all three lists.
 - Themes: `THEMES` in `app.js` — add a row, done.
-- Preset topics search 2 days; custom keywords 7 days (`activeSections()`).
+- Preset topics search 2 days (or per-preset `days`); custom keywords 7 days
+  (`activeSections()`). Saltwater fly news is scarce → flyfish preset uses 7.
 - Cards per section: 8 (`renderSection`). Preview fetch concurrency: 4 (`enrichCards`).
 - Junk summary filter: `cleanSummary()` in `app.js`.
+- Shipping UI changes: bump `?v=N` on style.css/app.js in index.html AND the
+  matching entries + cache name in `sw.js`.
 
 ## Known gaps / ideas backlog
 
