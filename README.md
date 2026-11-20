@@ -5,8 +5,9 @@ keywords, get a personal news feed. No accounts, no sign-up, no running costs.
 
 ## How it works
 
-- Headlines come live from Google News Australia via one tiny serverless
-  function (`api/feed.js`) that passes the RSS feed through to the browser.
+- Headlines come live from Google News Australia (with Bing News as a backup
+  for quiet topics) via one tiny serverless function (`api/feed.js`) that
+  passes the RSS feed through to the browser.
 - Your topic picks, keywords, and blocked words are saved in your own
   browser (localStorage) — nothing is stored on any server.
 - "Read it to me" uses your device's built-in text-to-speech.
@@ -26,5 +27,6 @@ part of the deployed app.
 
 ## Costs
 
-$0. Google News RSS is free, Vercel's free tier covers the hosting and the
-feed function, and there is no AI or paid API anywhere in the chain.
+$0. Google News and Bing News RSS are free, Vercel's free tier covers the
+hosting and the feed function, and there is no AI or paid API anywhere in the
+chain. Fonts are bundled, so nothing loads from a third party.

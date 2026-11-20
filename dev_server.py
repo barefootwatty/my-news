@@ -72,29 +72,38 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(payload)
             return
         if self.path.startswith("/api/feed"):
+            # mirrors api/feed.js: q = search, d = days (0 = no limit), s = "b" for the Bing backup
             qs = urllib.parse.urlparse(self.path).query
             params = urllib.parse.parse_qs(qs)
-            q = params.get("q", [""])[0].strip()[:200]
+            q = params.get("q", [""])[0].strip()[:300]
             if not q:
                 self.send_response(400); self.end_headers(); return
             try:
-                days = min(7, max(1, int(params.get("d", ["2"])[0])))
+                days = min(365, max(0, int(params.get("d", ["2"])[0])))
             except ValueError:
                 days = 2
-            url = ("https://news.google.com/rss/search?q="
-                   + urllib.parse.quote(q + f" when:{days}d")
-                   + "&hl=en-AU&gl=AU&ceid=AU:en")
+            if params.get("s", ["g"])[0] == "b":
+                url = ("https://www.bing.com/news/search?q=" + urllib.parse.quote(q)
+                       + "&format=rss&setmkt=en-AU")
+            else:
+                url = ("https://news.google.com/rss/search?q="
+                       + urllib.parse.quote(q + (f" when:{days}d" if days else ""))
+                       + "&hl=en-AU&gl=AU&ceid=AU:en")
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (MyNewsDev)"})
-                with urllib.request.urlopen(req, timeout=15) as r:
+                with urllib.request.urlopen(req, timeout=7) as r:
                     body = r.read()
+                if not re.search(rb"<rss[\s>]", body[:3000], re.I):
+                    raise ValueError("not a feed")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/xml; charset=utf-8")
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(body)
             except Exception as e:
-                self.send_response(502); self.end_headers()
+                self.send_response(502)
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
                 self.wfile.write(str(e).encode())
             return
         super().do_GET()

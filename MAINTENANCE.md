@@ -12,6 +12,8 @@ These were made to Glenn and, in writing, to the friends he shared the app with:
    No accounts, no analytics, no cookies, no server-side storage of user data.
    Settings live only in the browser's localStorage. Any feature that would
    send user data anywhere is off the table unless Glenn explicitly re-decides.
+   Fonts are bundled in `fonts/` for this reason — do NOT link Google Fonts or
+   any other third-party script, font or stylesheet.
 3. **Simple enough to share.** One link, no install, no instructions needed.
 
 ## What it is
@@ -29,15 +31,74 @@ These were made to Glenn and, in writing, to the friends he shared the app with:
 | Piece | File | What it does |
 |---|---|---|
 | App shell | `index.html` | Welcome/settings screen + feed container. One page. |
-| Logic | `app.js` | Settings (localStorage), feed build, themes, greeting, voice, card enrichment. |
-| Styling | `style.css` | Theme via CSS variables set from JS. `[hidden]{display:none!important}` is load-bearing. |
-| Feed fetch | `api/feed.js` | Vercel function. Proxies Google News RSS (`?q=` query, `&d=` days 1–7). CORS + 10 min CDN cache. |
+| Logic | `app.js` | Settings (localStorage), keyword parsing, feed build, looks, greeting, voice, card enrichment, setup link. |
+| Styling | `style.css` | Colours via CSS variables set from JS (`THEMES`). `[hidden]{display:none!important}` is load-bearing. |
+| Fonts | `fonts/` | Mulish (headings), Barlow (labels/UI), Caudex (summaries) — the AA brand fonts, latin subset, with their OFL licences. |
+| Feed fetch | `api/feed.js` | Vercel function. Proxies a news RSS feed: `?q=` query, `&d=` days (1–365, 0 = no limit), `&s=b` for the Bing News backup (default Google News AU). 7 s timeout. Good answers CDN-cached 10 min; failures return 502 and are never cached. |
 | Card enrichment | `api/preview.js` | THE FRAGILE ONE — see below. |
-| PWA | `manifest.webmanifest`, `sw.js`, `icon-*.png` | Add-to-home-screen. Bump the cache name in `sw.js` (`mynews-shell-vN`) when shipping UI changes. |
-| Local dev | `dev_server.py` | `python3 dev_server.py` → localhost:8765. Mirrors both API functions in Python. NOT deployed. |
+| PWA | `manifest.webmanifest`, `sw.js`, `icon-*.png` | Add-to-home-screen. The service worker is network-first, so a push reaches everyone on their next open. |
+| Local dev | `dev_server.py` | `python3 dev_server.py` → localhost:8765. Mirrors both API functions in Python. NOT deployed (see `.vercelignore`). |
 
 User settings key: `mynews.settings.v1` (JSON), background photo:
-`mynews.bgphoto.v1` (JPEG data-URL) — both localStorage.
+`mynews.bgphoto.v1` (JPEG data-URL) — both localStorage. `settings.v` is the
+data version; `migrate()` in `app.js` runs one-off upgrades when it is behind
+`DATA_VERSION`.
+
+## How a section finds its stories (rebuilt Nov 2026)
+
+The Nov 2026 complaint was "no news for my keywords". Three causes, all fixed:
+multi-word keywords were searched as an exact quoted phrase (almost never
+matches a headline); the window was capped at 7 days; and a blocked or failed
+Google request came back as a cached "200" that the app showed as "nothing on
+this topic".
+
+Now, per section (`loadSection` in `app.js`):
+
+1. Ask Google News for the section's first window (presets 2 days, keywords 7).
+2. Keep only stories that are on-topic (`pick`): the headline, source name or
+   feed description must mention enough of the keyword's groups.
+3. Fewer than 3 kept? A keyword also asks Bing News (once) and merges it in.
+   Bing's feed carries the real article link, a summary and a picture, so
+   those stories skip `api/preview.js` entirely.
+4. Still fewer than 3? Widen and repeat — presets 2 → 7 days; keywords
+   7 → 30 days → no limit (capped at a year, 5 stories). A gold note on the
+   section says when it had to look back further.
+5. Google failed outright? Bing alone carries the section. Both failed? The
+   section shows a "Couldn't reach the news sources" message with a Try again
+   button — never a false "nothing here".
+
+### Keyword syntax (`parseKeyword`)
+
+Stored as plain strings in `settings.customKeywords`, so old keywords keep working.
+
+| Typed | Means |
+|---|---|
+| `Bensbach` | stories must mention it |
+| `barramundi stocking` | plain words: both must appear (3+ plain words may miss one) |
+| `yellowcheek / yellow cheek` | slash (with spaces) = either-or |
+| `Lake Murray, PNG / Papua` | comma = must-have-both, every part required |
+| `F-150 [Australia / Aussie]` | brackets steer the search and float matches up, but aren't required |
+| `NT grants: NT, grant / funding` | `Name: ` prefix = short section name |
+| anything with `( )` | passed to Google untouched (legacy) |
+
+Matching (`termRe`): word-start, case-insensitive; long words also match their
+endings (`grant` → grants); spaces and hyphens are interchangeable (`F-150` →
+F150, `fly fish` → flyfishing); short words, numbers and CAPS acronyms of 2–3
+letters must match exactly (`NT` never hits "ant" or "nt" inside a word).
+In plain keywords `nt`, `png`, `qld` etc. expand to their full names, and
+"Australia" becomes a steering word rather than a required one.
+
+`RETUNE` in `app.js` is a one-off map that swapped Glenn's six dead keywords for
+tuned versions on first load of v4. Tune a keyword for him by sending a setup
+link (below) or having him retype it.
+
+### Setup link
+
+Settings → "Copy my setup link" builds `…/#setup=<base64 JSON>` carrying
+topics, keywords, blocked words and look (not the photo or the learning lists).
+Opening it shows a confirm box before anything is replaced. The data sits after
+the `#`, which browsers never send to a server — the privacy promise holds.
+Note: an iPhone home-screen app keeps its own storage, separate from Safari.
 
 ## The fragile bit: api/preview.js
 
@@ -69,34 +130,50 @@ redirect page). This is the same approach as the open-source
 
 - Topics: `PRESETS` in `app.js` (label + Google News query). NT query is tuned
   to avoid people named Darwin: `"Northern Territory" OR "Top End" OR (Darwin Australia)`.
-- **Relevance (added 10 Aug 2026):** Google News search results are shockingly
+- **Relevance (10 Aug 2026):** Google News search results are shockingly
   loose (a `"fly fishing"` search returns NBA and deer-hunting stories), so each
-  preset can carry `match` — words that must appear in the headline (word-start
-  match, so "fish" also hits "fishing") — and optional `prefer` — words that
-  float a story to the top (used to put saltwater fly stories first). Custom
-  keywords are searched as a quoted phrase and matched against their own
-  significant words. If a section goes empty too often, loosen its `match` list.
-- **Swipe (added 10 Aug 2026):** swipe left = remove story (key stored in
-  `settings.hiddenKeys`, cap 500); swipe right reveals 👍/👎. 👍 stores headline
-  words in `boosts` (sorted up), 👎 in `brakes` (sorted down; 2+ hits = skipped).
-  Caps 100 each. Words matching an active topic's `match`/`prefer` terms are
-  never learned (`protectedTerms()`), so a 👎 on one Darwin story can't sink the
-  NT section. "Start the learning fresh" in settings clears all three lists.
-- Themes: `THEMES` in `app.js` — add a row, done.
-- Preset topics search 2 days (or per-preset `days`); custom keywords 7 days
-  (`activeSections()`). Saltwater fly news is scarce → flyfish preset uses 7.
-- Cards per section: 8 (`renderSection`). Preview fetch concurrency: 4 (`enrichCards`).
+  preset can carry `match` — words the story must mention (word-start match, so
+  "fish" also hits "fishing") — and optional `prefer` — words that float a story
+  to the top (used to put saltwater fly stories first). If a section goes empty
+  too often, loosen its `match` list. Custom keywords: see the syntax above.
+- **Story actions:** swipe left = hide (key stored in `settings.hiddenKeys`,
+  cap 500); swipe right, or the ⋯ button, opens More like this / Less like this
+  / Hide. "More" stores headline words in `boosts` (sorted up), "Less" in
+  `brakes` (sorted down; 2+ hits = skipped). Caps 100 each. Words belonging to
+  an active topic are never learned (`protectedTerms()`), so one "Less" on a
+  Darwin story can't sink the NT section. "Start the learning fresh" in settings
+  clears all three lists.
+- Looks: `THEMES` in `app.js`. `auto` = Day/Night following the device. Day and
+  Night are the Angling Adventures palette (navy #093657, sky #1798CF, gold
+  #E0A23B — **no orange, ever**; source of truth is the Drive doc
+  `AA-Brand-Reference`). Walkabout is olive / cork / nickel. No logos anywhere:
+  Glenn's call, Nov 2026 — it's his personal app, not an AA product.
+- Windows: `ladder` in `activeSections()`. Minimum stories before widening:
+  `MIN_STORIES` (3).
+- Stories per section: 8, or 5 from the year-long look-back (`renderSection`).
+  The first story of each section is the "lead" (big headline; full-width
+  picture when the image is 480px+ wide).
+- Pictures and summaries load only for stories on or near the screen
+  (`previewWatch`), 4 at a time (`queuePreview`).
 - Junk summary filter: `cleanSummary()` in `app.js`.
 - Shipping UI changes: bump `?v=N` on style.css/app.js in index.html AND the
-  matching entries + cache name in `sw.js`.
+  matching entries + cache name in `sw.js`. If you add a file to the `FILES`
+  list in `sw.js`, make sure it exists — one 404 there and the new service
+  worker never installs.
 
 ## Known gaps / ideas backlog
 
+- **Bing News feed** (`https://www.bing.com/news/search?q=…&format=rss`) is as
+  unofficial as the Google one. If it changes shape, `parseBing()` in `app.js`
+  is the only place that reads it; failure is soft (the backup just adds nothing).
 - Photo background upload is untested with a real photo (canvas resize +
   localStorage quota path).
-- "Good News" preset matches the literal phrase, so US sports "good news"
-  stories sneak in. Better query welcome.
-- Ideas Glenn liked but hasn't asked for: top-story banner, BOM weather strip
-  (bom.gov.au has free feeds), per-section read-aloud buttons.
+- "Good News" preset: widened in Nov 2026 to heartwarming / uplifting /
+  kindness words. Still imperfect; tune `match` if junk sneaks in.
+- Yellowcheek, Bensbach and fly-tying patterns barely make the *news*. The real
+  content is on YouTube, Reddit and blogs — a possible free add-on source, not
+  yet investigated.
+- Ideas Glenn liked but hasn't asked for: BOM weather strip (bom.gov.au has
+  free feeds), per-section read-aloud buttons.
 - Old retired site still up at barefoot-daily-news.vercel.app (frozen 15 Jul
   2026); its repo's nightly workflow is disabled but manual-runnable.

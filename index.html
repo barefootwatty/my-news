@@ -5,36 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>My News — your news, your way</title>
 <meta name="description" content="Pick your interests and keywords, get your own free daily news feed. No accounts, no cost.">
-<meta name="theme-color" content="#e8641b">
+<meta name="theme-color" content="#093657">
+<meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="My News">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=3">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preload" href="fonts/mulish-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
 <header id="topbar" hidden>
-  <div class="brand">
-    <svg viewBox="0 0 48 48" class="logo" aria-hidden="true">
-      <circle cx="24" cy="18" r="9" fill="#fff"/>
-      <rect x="8" y="31" width="32" height="4.5" rx="2.25" fill="#fff"/>
-      <rect x="14" y="39" width="20" height="4.5" rx="2.25" fill="#fff"/>
-    </svg>
-    <div>
-      <h1>My News</h1>
-      <p class="tagline">Your news, your way</p>
-    </div>
-  </div>
+  <h1>My News</h1>
   <div class="actions">
-    <button id="btn-listen" title="Read it to me" aria-label="Read the headlines aloud">🔊</button>
-    <button id="btn-refresh" title="Refresh" aria-label="Refresh the news">↻</button>
-    <button id="btn-share" title="Share this app" aria-label="Share this app">📤</button>
-    <button id="btn-settings" title="Settings" aria-label="Settings">⚙️</button>
+    <button id="btn-listen" type="button" title="Read it to me" aria-label="Read the headlines aloud">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none"/></svg>
+    </button>
+    <button id="btn-refresh" type="button" title="Refresh" aria-label="Refresh the news">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" fill="none"/><path d="M19.8 3.8v4.4h-4.4" fill="none"/></svg>
+    </button>
+    <button id="btn-share" type="button" title="Share this app" aria-label="Share this app">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 7.5 12 3.5l4 4M6 11.5v7.5h12v-7.5" fill="none"/></svg>
+    </button>
+    <button id="btn-settings" type="button" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" fill="none"/><circle cx="15" cy="7" r="2.2" fill="none"/><circle cx="9" cy="17" r="2.2" fill="none"/></svg>
+    </button>
   </div>
 </header>
 
@@ -42,39 +41,45 @@
 <section id="setup" hidden>
   <div class="setup-inner">
     <div class="setup-head">
-      <svg viewBox="0 0 48 48" class="logo big" aria-hidden="true">
-        <circle cx="24" cy="18" r="9" fill="var(--accent)"/>
-        <rect x="8" y="31" width="32" height="4.5" rx="2.25" fill="var(--accent)"/>
-        <rect x="14" y="39" width="20" height="4.5" rx="2.25" fill="var(--accent)"/>
-      </svg>
       <h2 id="setup-title">Welcome to My News</h2>
+      <span class="goldrule"></span>
       <p id="setup-blurb">Tap the topics you care about, add your own keywords, and get a news feed that's yours. Free, no sign-up, saved on your phone.</p>
     </div>
 
-    <h3>Your name <span class="optional">(optional)</span></h3>
+    <h3><label for="name-input">Your name</label> <span class="optional">(optional)</span></h3>
     <p class="hint">So the app can say g'day properly.</p>
     <div class="kw-row">
       <input id="name-input" type="text" placeholder="e.g. Watty" autocomplete="off" maxlength="30">
     </div>
 
-    <h3>Make it yours</h3>
-    <p class="hint">Pick a colour theme, or use one of your own photos as the background.</p>
+    <h3>The look</h3>
+    <p class="hint">Auto follows your device: Day in light mode, Night in dark mode. You can also put one of your own photos behind the news.</p>
     <div id="theme-row" class="theme-row"></div>
     <div class="kw-row photo-row">
-      <label class="small-btn file-btn">📷 Use my photo<input id="bg-input" type="file" accept="image/*" hidden></label>
-      <button id="bg-remove" class="small-btn ghost" hidden>Remove photo</button>
+      <label class="small-btn ghost file-btn">Use my photo<input id="bg-input" type="file" accept="image/*" hidden></label>
+      <button id="bg-remove" type="button" class="small-btn ghost" hidden>Remove photo</button>
     </div>
 
     <h3>Pick your topics</h3>
     <div id="preset-grid" class="chip-grid"></div>
 
-    <h3>Add your own keywords</h3>
-    <p class="hint">Anything you like — a town, a team, a fish, a hobby. Press Add after each one.</p>
+    <h3><label for="kw-input">Add your own keywords</label></h3>
+    <p class="hint">A town, a team, a fish, a hobby. One or two words finds the most. Press Add after each one.</p>
     <div class="kw-row">
-      <input id="kw-input" type="text" placeholder="e.g. barramundi" autocomplete="off" enterkeyhint="done">
-      <button id="kw-add" class="small-btn">Add</button>
+      <input id="kw-input" type="text" placeholder="e.g. barramundi" autocomplete="off" autocapitalize="off" enterkeyhint="done" maxlength="200">
+      <button id="kw-add" type="button" class="small-btn">Add</button>
     </div>
     <div id="custom-chips" class="chip-grid"></div>
+    <details class="tips">
+      <summary>Getting more out of keywords</summary>
+      <ul>
+        <li><b>Either-or:</b> put a slash between them. <code>yellowcheek / yellow cheek</code></li>
+        <li><b>Must have both:</b> put a comma between them. <code>Lake Murray, PNG / Papua</code></li>
+        <li><b>Give it a short name:</b> start with the name and a colon. <code>NT grants: NT, grant / funding</code></li>
+        <li><b>Nudge the search</b> without requiring the word: square brackets. <code>F-150 [Australia / Aussie]</code></li>
+        <li>Quiet topics look back further on their own: a week, then a month, then a year.</li>
+      </ul>
+    </details>
 
     <h3>Skip the grim stuff <span class="optional">(optional)</span></h3>
     <p class="hint">Hide stories whose headline mentions any of these words.</p>
@@ -83,28 +88,32 @@
       <span>Hide stories with my blocked words</span>
     </label>
     <div class="kw-row">
-      <input id="mute-input" type="text" placeholder="e.g. crash" autocomplete="off" enterkeyhint="done">
-      <button id="mute-add" class="small-btn">Add</button>
+      <input id="mute-input" type="text" placeholder="e.g. crash" aria-label="Word to block" autocomplete="off" enterkeyhint="done" maxlength="60">
+      <button id="mute-add" type="button" class="small-btn">Add</button>
     </div>
     <div id="mute-chips" class="chip-grid"></div>
 
-    <h3>Swipe controls</h3>
-    <p class="hint">On your feed: swipe a story <b>left</b> to remove it, or <b>right</b> to say "more like this" or "less like this". The app learns your taste — all on this device.</p>
-    <button id="swipe-reset" class="small-btn ghost">Start the learning fresh</button>
+    <h3>Teaching it your taste</h3>
+    <p class="hint">On your feed, swipe a story <b>left</b> to hide it, or <b>right</b> for "more like this" and "less like this". The ⋯ button on each story does the same. The app learns what you like, all on this device.</p>
+    <button id="swipe-reset" type="button" class="small-btn ghost">Start the learning fresh</button>
 
     <h3>Reading voice</h3>
-    <p class="hint">Used by the 🔊 "read it to me" button. Voices come from your device.</p>
+    <p class="hint">Used by the read-aloud button. Voices come from your device.</p>
     <div class="kw-row">
-      <select id="voice-sel"><option value="">Auto (device default)</option></select>
-      <select id="rate-sel">
+      <select id="voice-sel" aria-label="Voice"><option value="">Auto (device default)</option></select>
+      <select id="rate-sel" aria-label="Reading speed">
         <option value="0.9">Slower</option>
         <option value="1" selected>Normal</option>
         <option value="1.15">Faster</option>
       </select>
     </div>
-    <button id="voice-test" class="small-btn ghost">▶ Test the voice</button>
+    <button id="voice-test" type="button" class="small-btn ghost">Test the voice</button>
 
-    <button id="btn-done" class="cta">Show me my news</button>
+    <h3>Use it on another device</h3>
+    <p class="hint">Your setup lives on this device only. This link carries your topics, keywords, blocked words and look to your other phone or computer. Open it there and tap Load setup.</p>
+    <button id="setup-copy" type="button" class="small-btn ghost">Copy my setup link</button>
+
+    <button id="btn-done" type="button" class="cta">Show me my news</button>
   </div>
 </section>
 
@@ -112,9 +121,9 @@
 <main id="feed" hidden></main>
 
 <footer id="foot" hidden>
-  <p>My News — free news from Google News Australia. Your picks stay on your device.</p>
+  <p>Headlines from Google News Australia, with Bing News as a backup. Your picks stay on your device.</p>
 </footer>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

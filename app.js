@@ -2,10 +2,12 @@
 
 const STORE_KEY = "mynews.settings.v1";
 const PHOTO_KEY = "mynews.bgphoto.v1"; // stored separately: photos are big
+const DATA_VERSION = 4;
 
-/* Each preset has a Google News query, and optionally `match`: words that must
-   appear in the headline (word-start match, so "fish" also catches "fishing").
-   Google pads searches with loosely "related" stories — `match` weeds them out. */
+/* Each preset has a Google News query, and optionally `match`: words the story
+   must mention (word-start match, so "fish" also catches "fishing").
+   Google pads searches with loosely "related" stories — `match` weeds them out.
+   `prefer` words float a story to the top of its section. */
 const PRESETS = [
   { id: "nt",       label: "Top End & NT",    query: '"Northern Territory" OR "Top End" OR (Darwin Australia)',
     match: ["northern territory", "top end", "territor", "darwin", "kakadu", "katherine", "arnhem", "litchfield", "tiwi", "nhulunbuy", "palmerston", "daly river", "alice springs"] },
@@ -14,13 +16,15 @@ const PRESETS = [
   // saltwater fly news is scarce (often none for a week), so the section keeps
   // all real fly-fishing stories but `prefer` floats saltwater ones to the top
   { id: "flyfish",  label: "Fly Fishing",     query: '"saltwater fly fishing" OR "fly fishing" OR flyfishing', days: 7,
-    match: ["fly fish", "fly-fish", "flyfish"],
+    match: ["fly fish"],
     prefer: ["saltwater", "salt water", "bonefish", "tarpon", "trevally", "queenfish", "barramundi", "permit", "milkfish", "flats", "estuary", "giant herring"] },
   { id: "boating",  label: "Boating",         query: "boating Australia",
     match: ["boat", "marine", "yacht", "vessel", "sail", "ferry", "harbour", "tinnie", "skipper"] },
   { id: "weather",  label: "Weather",         query: "weather Australia BOM",
     match: ["weather", "forecast", "cyclone", "storm", "rain", "flood", "heat", "monsoon", "temperature", "wind", "wet season"] },
-  { id: "goodnews", label: "Good News",       query: '"good news" Australia' },
+  { id: "goodnews", label: "Good News",       query: '("good news" OR heartwarming OR uplifting OR "feel-good" OR kindness) Australia',
+    match: ["good news", "heartwarm", "uplift", "feel good", "kindness", "reunit", "rescue", "generous", "celebrat", "inspir", "miracle"],
+    prefer: ["heartwarm", "uplift", "kindness", "reunit", "feel good"] },
   { id: "afl",      label: "AFL Footy",       query: "AFL football" },
   { id: "nrl",      label: "Rugby League",    query: "NRL rugby league" },
   { id: "cricket",  label: "Cricket",         query: "cricket Australia" },
@@ -30,22 +34,35 @@ const PRESETS = [
   { id: "world",    label: "World News",      query: "world news" },
 ];
 
+/* Looks. "auto" follows the device: Day in light mode, Night in dark mode. */
 const THEMES = [
-  { id: "sunset", label: "Sunset", accent: "#e8641b", accentDark: "#c9520f", bg: "#fff8f0", ink: "#2b2018", inkSoft: "#6b5d50", card: "#ffffff", line: "#f0e2d2" },
-  { id: "ocean",  label: "Ocean",  accent: "#0e7fb8", accentDark: "#0a628f", bg: "#f0f7fb", ink: "#142833", inkSoft: "#4e6675", card: "#ffffff", line: "#d9eaf3" },
-  { id: "reef",   label: "Reef",   accent: "#00897b", accentDark: "#00695c", bg: "#f0f8f6", ink: "#15302b", inkSoft: "#527a72", card: "#ffffff", line: "#d4ebe6" },
-  { id: "coral",  label: "Coral",  accent: "#d6455f", accentDark: "#b03049", bg: "#fdf2f4", ink: "#33161d", inkSoft: "#7d5560", card: "#ffffff", line: "#f6dbe1" },
-  { id: "night",  label: "Night",  accent: "#ff8a3d", accentDark: "#e56f20", bg: "#161210", ink: "#f2eae1", inkSoft: "#b3a596", card: "#221c17", line: "#3a3129" },
+  { id: "auto", label: "Auto" },
+  { id: "day", label: "Day", vars: {
+      bar1: "#0d456f", bar2: "#093657", barInk: "#ffffff", barSoft: "#84B6DB",
+      accent: "#1798CF", strong: "#093657", strongInk: "#ffffff", gold: "#E0A23B",
+      bg: "#F4F8FB", sheet: "#ffffff", ink: "#141414", head: "#093657", inkSoft: "#4A6274",
+      rule: "#84B6DB", line: "#E1EBF2", note: "#FBF6EC", shadow: "0 10px 26px rgba(9,54,87,.10)" } },
+  { id: "night", label: "Night", vars: {
+      bar1: "#0b3a5e", bar2: "#072a44", barInk: "#ffffff", barSoft: "#84B6DB",
+      accent: "#1798CF", strong: "#E0A23B", strongInk: "#093657", gold: "#E0A23B",
+      bg: "#051C2E", sheet: "#0A2E4B", ink: "#F2F7FB", head: "#84B6DB", inkSoft: "#A3C4DC",
+      rule: "#1F5F8A", line: "#154463", note: "#12395A", shadow: "0 10px 26px rgba(0,0,0,.30)" } },
+  { id: "walkabout", label: "Walkabout", vars: {
+      bar1: "#45553D", bar2: "#2E3A29", barInk: "#F6F1E6", barSoft: "#CBB892",
+      accent: "#6E7F4F", strong: "#2E3A29", strongInk: "#F6F1E6", gold: "#B98A4E",
+      bg: "#F3EEE2", sheet: "#FFFCF5", ink: "#22251E", head: "#2E3A29", inkSoft: "#5F6553",
+      rule: "#B4BABC", line: "#E6DECD", note: "#EFE6D2", shadow: "0 10px 26px rgba(46,58,41,.12)" } },
 ];
 
 const DEFAULTS = {
+  v: 0,
   onboarded: false,
   presetIds: [],
   customKeywords: [],
   muteOn: false,
   muteWords: [],
   name: "",
-  theme: "sunset",
+  theme: "auto",
   voiceURI: "",
   rate: 1,
   hiddenKeys: [],   // stories swiped away — never shown again
@@ -54,35 +71,72 @@ const DEFAULTS = {
   swipeTipSeen: false,
 };
 
+/* One-off re-tune (Nov 2026): these long keywords were searched as exact
+   phrases and never found a story. Swap them for versions that do. */
+const RETUNE = {
+  "yellow cheek carp fishing": ["Yellowcheek: yellowcheek / yellow cheek carp / Elopichthys"],
+  "nt small business grant": ["NT business grants: Northern Territory / NT / Territory / Territorian, business, grant / funding / voucher"],
+  "bensbach river png": ["Bensbach"],
+  "lake murray png": ["Lake Murray PNG: Lake Murray, PNG / Papua New Guinea / Papua / Western Province / black bass"],
+  "streamer fly tying pattern": ["Streamer fly tying: fly tying / fly pattern / fly tier / tying, streamer / clouser / deceiver / baitfish"],
+  "afant f150 australia": ["AFANT: AFANT / Amateur Fishermen's Association", "F-150: F-150 / F-Series [Australia / Aussie]"],
+};
+
 let settings = load();
 let speaking = false;
 let latestBySection = {}; // sectionLabel -> [items] (for read-aloud)
 
 function load() {
+  let s = { ...DEFAULTS };
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    if (raw) s = { ...DEFAULTS, ...JSON.parse(raw) };
   } catch (e) { /* corrupted or blocked storage — start fresh */ }
-  return { ...DEFAULTS };
+  return migrate(s);
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch (e) {}
 }
 
+function migrate(s) {
+  for (const k of ["presetIds", "customKeywords", "muteWords", "hiddenKeys", "boosts", "brakes"]) {
+    if (!Array.isArray(s[k])) s[k] = [];
+  }
+  if (!THEMES.some((t) => t.id === s.theme)) s.theme = "auto"; // older colour themes retired
+  if ((s.v || 0) < DATA_VERSION) {
+    const out = [];
+    for (const kw of s.customKeywords) {
+      const swap = RETUNE[String(kw).toLowerCase().replace(/\s+/g, " ").trim()];
+      for (const k of swap || [kw]) {
+        if (!out.some((x) => x.toLowerCase() === k.toLowerCase())) out.push(k);
+      }
+    }
+    s.customKeywords = out;
+    s.v = DATA_VERSION;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  return s;
+}
+
 /* ---------- look & feel ---------- */
 
+const darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+function activeTheme() {
+  let id = settings.theme;
+  if (id === "auto") id = darkQuery && darkQuery.matches ? "night" : "day";
+  return THEMES.find((x) => x.id === id) || THEMES[1];
+}
+
 function applyLook() {
-  const t = THEMES.find((x) => x.id === settings.theme) || THEMES[0];
+  const t = activeTheme();
   const r = document.documentElement.style;
-  r.setProperty("--accent", t.accent);
-  r.setProperty("--accent-dark", t.accentDark);
-  r.setProperty("--bg", t.bg);
-  r.setProperty("--ink", t.ink);
-  r.setProperty("--ink-soft", t.inkSoft);
-  r.setProperty("--card", t.card);
-  r.setProperty("--line", t.line);
+  for (const [k, v] of Object.entries(t.vars)) {
+    r.setProperty("--" + k.replace(/[A-Z0-9]/g, (c) => "-" + c.toLowerCase()), v);
+  }
+  document.documentElement.dataset.theme = t.id;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = t.accent;
+  if (meta) meta.content = t.vars.bar2;
 
   let photo = null;
   try { photo = localStorage.getItem(PHOTO_KEY); } catch (e) {}
@@ -109,13 +163,13 @@ function setBackgroundPhoto(file) {
     try {
       localStorage.setItem(PHOTO_KEY, dataUrl);
     } catch (e) {
-      alert("That photo is too big to store — try a smaller one.");
+      toast("That photo is too big to store. Try a smaller one.");
       return;
     }
     applyLook();
     renderPhotoButtons();
   };
-  img.onerror = () => alert("Couldn't read that photo — try a different one.");
+  img.onerror = () => { URL.revokeObjectURL(url); toast("Couldn't read that photo. Try a different one."); };
   img.src = url;
 }
 
@@ -137,6 +191,7 @@ const $ = (id) => document.getElementById(id);
 
 function showSetup(editing) {
   stopSpeaking();
+  feedGen++; // abandon any feed still loading
   $("setup").hidden = false;
   $("feed").hidden = true;
   $("foot").hidden = true;
@@ -145,7 +200,7 @@ function showSetup(editing) {
   $("setup-blurb").textContent = editing
     ? "Change your topics, look, voice or blocked words, then save."
     : "Tap the topics you care about, add your own keywords, and get a news feed that's yours. Free, no sign-up, saved on your phone.";
-  $("btn-done").textContent = editing ? "Save & show my news" : "Show me my news";
+  $("btn-done").textContent = editing ? "Save and show my news" : "Show me my news";
   $("name-input").value = settings.name;
   renderThemeRow();
   renderPhotoButtons();
@@ -155,6 +210,7 @@ function showSetup(editing) {
   renderVoiceOptions();
   $("mute-on").checked = settings.muteOn;
   $("rate-sel").value = String(settings.rate);
+  window.scrollTo(0, 0);
 }
 
 function showFeed() {
@@ -172,10 +228,17 @@ function renderThemeRow() {
   row.innerHTML = "";
   for (const t of THEMES) {
     const b = document.createElement("button");
-    b.className = "theme-dot" + (settings.theme === t.id ? " on" : "");
-    b.style.background = `linear-gradient(135deg, ${t.accent} 55%, ${t.bg} 55%)`;
-    b.textContent = t.label;
-    b.title = t.label + " theme";
+    b.type = "button";
+    b.className = "theme-pick" + (settings.theme === t.id ? " on" : "");
+    b.setAttribute("aria-pressed", settings.theme === t.id ? "true" : "false");
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    const day = THEMES[1].vars, night = THEMES[2].vars;
+    sw.style.background = t.vars
+      ? `linear-gradient(135deg, ${t.vars.bar2} 50%, ${t.vars.gold} 50%)`
+      : `linear-gradient(135deg, ${day.bg} 50%, ${night.bg} 50%)`;
+    b.append(sw, t.label);
+    b.title = t.id === "auto" ? "Day or Night, following your device" : t.label + " look";
     b.onclick = () => {
       settings.theme = t.id;
       save();
@@ -190,8 +253,11 @@ function renderPresetChips() {
   const grid = $("preset-grid");
   grid.innerHTML = "";
   for (const p of PRESETS) {
+    const on = settings.presetIds.includes(p.id);
     const b = document.createElement("button");
-    b.className = "chip" + (settings.presetIds.includes(p.id) ? " on" : "");
+    b.type = "button";
+    b.className = "chip" + (on ? " on" : "");
+    b.setAttribute("aria-pressed", on ? "true" : "false");
     b.textContent = p.label;
     b.onclick = () => {
       const i = settings.presetIds.indexOf(p.id);
@@ -204,14 +270,16 @@ function renderPresetChips() {
   }
 }
 
-function chipList(containerId, items, onRemove) {
+function chipList(containerId, items, labelOf, onRemove) {
   const grid = $(containerId);
   grid.innerHTML = "";
   items.forEach((word, idx) => {
     const b = document.createElement("button");
+    b.type = "button";
     b.className = "chip on";
-    b.innerHTML = "";
-    b.append(word);
+    b.append(labelOf(word));
+    b.title = word;
+    b.setAttribute("aria-label", "Remove " + labelOf(word));
     const x = document.createElement("span");
     x.className = "x";
     x.textContent = "×";
@@ -221,19 +289,19 @@ function chipList(containerId, items, onRemove) {
   });
 }
 function renderCustomChips() {
-  chipList("custom-chips", settings.customKeywords, (i) => {
+  chipList("custom-chips", settings.customKeywords, (kw) => parseKeyword(kw).label, (i) => {
     settings.customKeywords.splice(i, 1); save(); renderCustomChips();
   });
 }
 function renderMuteChips() {
-  chipList("mute-chips", settings.muteWords, (i) => {
+  chipList("mute-chips", settings.muteWords, (w) => w, (i) => {
     settings.muteWords.splice(i, 1); save(); renderMuteChips();
   });
 }
 
-function addFromInput(inputId, list, rerender) {
+function addFromInput(inputId, list, rerender, maxLen) {
   const el = $(inputId);
-  const v = el.value.trim().replace(/\s+/g, " ").slice(0, 60);
+  const v = el.value.trim().replace(/\s+/g, " ").slice(0, maxLen || 60);
   if (!v) return;
   if (!list.some((w) => w.toLowerCase() === v.toLowerCase())) list.push(v);
   el.value = "";
@@ -278,36 +346,151 @@ function chosenVoice() {
   return voices.find((v) => v.lang === "en-AU") || voices[0] || null;
 }
 
+/* ---------- keywords: turning what was typed into a search + a relevance test ----------
+
+   A keyword becomes `groups` — each group is a list of alternatives, and a
+   story is on-topic when it mentions enough of the groups.
+
+     Bensbach                        one word — stories must mention it
+     barramundi stocking             two plain words — both must appear
+     yellowcheek / yellow cheek      "/" means either-or
+     Lake Murray, PNG / Papua        "," means must-have-both (every part required)
+     F-150 [Australia]               [brackets] steer the search and float matching
+                                     stories up, but aren't required in the story
+     NT grants: NT, grant / funding  "Name: ..." gives the section a short name
+
+   Plain keywords of 3+ words may miss one word (so "kakadu barra fishing news"
+   still finds things); anything written with commas is strict. */
+
+const KW_STOP = new Set("the a an and for of in on to at with news latest".split(" "));
+const KW_CONTEXT = new Set(["australia", "australian", "aussie"]);
+const KW_ALIAS = {
+  nt: ["Northern Territory", "NT"], png: ["PNG", "Papua New Guinea"], wa: ["Western Australia", "WA"],
+  qld: ["Queensland", "Qld"], nsw: ["New South Wales", "NSW"], tas: ["Tasmania", "Tas"],
+  vic: ["Victoria", "Vic"], nz: ["New Zealand", "NZ"], uk: ["UK", "Britain", "United Kingdom"],
+  usa: ["USA", "United States"],
+};
+
+const kwCache = new Map();
+function parseKeyword(raw) {
+  const hit = kwCache.get(raw);
+  if (hit) return hit;
+  const typed = String(raw).replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").trim();
+  let s = typed;
+  let label = "";
+  const named = s.match(/^([^:"()\[\]\/|,]{1,40}):\s+(\S.*)$/);
+  if (named) { label = named[1].trim(); s = named[2].trim(); }
+
+  let out;
+  if (/[()]/.test(s)) {
+    // hand-written Google search — pass it through, lightly sanity-check the results
+    const words = sigWords(s);
+    out = { label: label || typed, query: s, groups: words.length ? [words] : [], need: words.length ? 1 : 0, prefer: [] };
+  } else {
+    const prefer = [];
+    s = s.replace(/\[([^\]]*)\]/g, (m, inner) => {
+      for (const t of inner.split(/\s*[\/|,]\s*/)) if (t.trim()) prefer.push(t.trim());
+      return " ";
+    }).trim();
+
+    let groups = [];
+    const structured = /,|\s\/\s|\||\sOR\s|\s\+\s/.test(s);
+    if (structured) {
+      groups = s.split(/\s*,\s*|\s+\+\s+/)
+        .map((part) => part.split(/\s+\/\s+|\s*\|\s*|\s+OR\s+/).map((t) => t.replace(/"/g, "").trim()).filter(Boolean))
+        .filter((g) => g.length);
+    } else {
+      const re = /"([^"]+)"|(\S+)/g;
+      let m;
+      while ((m = re.exec(s))) {
+        if (m[1]) { if (m[1].trim()) groups.push([m[1].trim()]); continue; }
+        const w = m[2].replace(/"/g, "").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+        const lw = w.toLowerCase();
+        if (!w || KW_STOP.has(lw)) continue;
+        if (KW_CONTEXT.has(lw)) { prefer.push(w); continue; }
+        groups.push(KW_ALIAS[lw] ? KW_ALIAS[lw].slice() : [w]);
+      }
+    }
+    if (!groups.length && prefer.length) groups = [prefer.splice(0)]; // only steering words typed, so they are the topic
+    if (!groups.length) groups = [[s.replace(/"/g, "") || typed]];
+    const n = groups.length;
+    const q = (t) => (/[\s\-']/.test(t) ? '"' + t + '"' : t);
+    const orJoin = (g) => (g.length > 1 ? "(" + g.map(q).join(" OR ") + ")" : q(g[0]));
+    const query = (groups.map(orJoin).join(" ") + (prefer.length ? " " + orJoin(prefer) : "")).slice(0, 280);
+    out = {
+      label: label || (structured ? groups[0][0] : s.replace(/"/g, "") || typed),
+      query, groups, prefer,
+      need: structured || n <= 2 ? n : n - 1,
+    };
+  }
+  kwCache.set(raw, out);
+  return out;
+}
+
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+/* Does the text mention this term?
+   - starts on a word boundary; longer words also match their endings
+     ("grant" hits "grants", "fish" hits "fishing")
+   - spaces and hyphens are interchangeable ("fly fish" hits "fly-fishing" and
+     "flyfishing"; "F-150" hits "F150")
+   - short words, numbers and CAPS acronyms must match exactly ("NT" never hits "ant") */
+const termCache = new Map();
+function termRe(term) {
+  let re = termCache.get(term);
+  if (re) return re;
+  const t = String(term).replace(/[’‘]/g, "'").trim();
+  const toks = t.split(/[\s\-–]+/).filter(Boolean);
+  if (!toks.length) re = /$^/;
+  else {
+    const acronym = /^[A-Z][A-Z0-9]{1,2}$/.test(t);
+    const last = toks[toks.length - 1];
+    const closed = acronym || last.length <= 3 || /\d/.test(last);
+    re = new RegExp(
+      "(?:^|[^A-Za-z0-9])" + toks.map(escapeRe).join("[\\s\\-–]*") + (closed ? "(?![A-Za-z0-9])" : ""),
+      acronym ? "" : "i"
+    );
+  }
+  termCache.set(term, re);
+  return re;
+}
+function anyTerm(text, terms) {
+  return terms.some((t) => termRe(t).test(text));
+}
+function groupsHit(text, groups) {
+  let n = 0;
+  for (const g of groups) if (anyTerm(text, g)) n++;
+  return n;
+}
+
 /* ---------- feed building ---------- */
 
 function activeSections() {
   const sections = [];
   for (const p of PRESETS) {
-    if (settings.presetIds.includes(p.id)) sections.push({ label: p.label, query: p.query, match: p.match, prefer: p.prefer, days: p.days || 2 });
+    if (!settings.presetIds.includes(p.id)) continue;
+    const days = p.days || 2;
+    sections.push({
+      kind: "preset", label: p.label, query: p.query,
+      groups: p.match ? [p.match] : [], need: p.match ? 1 : 0, prefer: p.prefer || [],
+      ladder: days < 7 ? [days, 7] : [days],
+    });
   }
   for (const kw of settings.customKeywords) {
-    // multi-word keywords are searched as an exact phrase — much more on-topic
-    const query = /\s/.test(kw) && !/["|()]/.test(kw) ? '"' + kw + '"' : kw;
-    // niche keywords get a wider window so the section isn't empty
-    sections.push({ label: kw, query, match: keywordTerms(kw), days: 7 });
+    const k = parseKeyword(kw);
+    // niche keywords widen their window (week → month → year) until they find something
+    sections.push({ kind: "custom", label: k.label, query: k.query, groups: k.groups, need: k.need, prefer: k.prefer, ladder: [7, 30, 0] });
   }
   return sections;
 }
 
-/* ---------- relevance: is a headline actually about the topic? ---------- */
+/* ---------- more/less learning ---------- */
 
 const STOP = new Set(("the and for with from that this have will your says said say new all out its " +
   "after over into been were their they them then than there here about when what where which just " +
   "amid near could would should also being because before while under against between during off on " +
   "australia australian aussie news live update updates today year years week day days more most").split(" "));
 
-function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
-
-/* Word-start match: "fish" hits "fishing" and "fishers" but not "catfish". */
-function titleHas(title, terms) {
-  const t = title.toLowerCase();
-  return terms.some((term) => new RegExp("\\b" + escapeRe(term)).test(t));
-}
 function hitCount(title, words) {
   const t = title.toLowerCase();
   let n = 0;
@@ -322,24 +505,21 @@ function sigWords(s) {
       .filter((w) => w.length >= 4 && !STOP.has(w))
   )].slice(0, 6);
 }
-function keywordTerms(kw) {
-  const words = sigWords(kw);
-  return words.length ? words : [kw.toLowerCase()];
-}
 
 function keyOf(title) {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 /* Words that define the user's chosen topics — never learned as more/less
-   signals, or one 👎 on a Darwin story could sink the whole NT section. */
+   signals, or one "less like this" on a Darwin story could sink the whole NT section. */
 function protectedTerms() {
-  const terms = [];
+  const terms = new Set();
   for (const s of activeSections()) {
-    if (s.match) terms.push(...s.match);
-    if (s.prefer) terms.push(...s.prefer);
+    for (const t of [].concat(...s.groups, s.prefer)) {
+      for (const w of t.toLowerCase().split(/[\s\-–]+/)) if (w) terms.add(w);
+    }
   }
-  return terms;
+  return [...terms];
 }
 function learnWords(title) {
   const prot = protectedTerms();
@@ -358,68 +538,154 @@ function remember(list, words, cap) {
 
 function greeting() {
   const h = new Date().getHours();
-  const part = h < 12 ? ["Morning", "☀️"] : h < 17 ? ["G'day", "🎣"] : ["Evening", "🌙"];
-  const name = settings.name ? ", " + settings.name : "";
-  return part[0] + name + " " + part[1];
+  const part = h < 12 ? "Morning" : h < 17 ? "G'day" : "Evening";
+  return part + (settings.name ? ", " + settings.name : "");
 }
+
+let feedGen = 0; // bumps on every rebuild so a slow, superseded load can't write to the page
 
 async function buildFeed() {
   stopSpeaking();
+  const gen = ++feedGen;
   const feed = $("feed");
   const sections = activeSections();
   latestBySection = {};
+  previewQueue.length = 0;
+  if (previewWatch) previewWatch.disconnect();
   feed.innerHTML = "";
 
-  const greet = document.createElement("div");
-  greet.className = "greet";
+  const mast = document.createElement("div");
+  mast.className = "mast";
   const today = new Date().toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" });
   const now = new Date().toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
-  greet.innerHTML = `<h2>${escapeHtml(greeting())}</h2><p>${today} · updated ${now}</p>`;
-  feed.appendChild(greet);
+  mast.innerHTML = `<div class="mast-in"><h2>${escapeHtml(greeting())}</h2><span class="goldrule"></span><p>${today}, updated ${now}</p></div>`;
+  feed.appendChild(mast);
+
+  const body = document.createElement("div");
+  body.className = "feed-body";
+  feed.appendChild(body);
 
   if (sections.length === 0) {
-    feed.innerHTML += '<div class="empty">No topics picked yet — tap ⚙️ to choose some.</div>';
+    const none = document.createElement("div");
+    none.className = "empty";
+    none.textContent = "No topics picked yet. Open settings to choose some.";
+    body.appendChild(none);
     return;
   }
 
   if (!settings.swipeTipSeen) {
     const tip = document.createElement("div");
-    tip.className = "swipe-tip";
-    tip.innerHTML = '<span>Tip: swipe a story <b>left</b> to remove it, or <b>right</b> to say "more like this" or "less like this".</span>';
+    tip.className = "note tip";
+    tip.innerHTML = '<span>Swipe a story <b>left</b> to hide it, or <b>right</b> for more or less like it. The ⋯ button on each story does the same.</span>';
     const ok = document.createElement("button");
+    ok.type = "button";
     ok.textContent = "Got it";
     ok.onclick = () => { settings.swipeTipSeen = true; save(); tip.remove(); };
     tip.appendChild(ok);
-    feed.appendChild(tip);
+    body.appendChild(tip);
   }
 
-  const seenGlobal = new Set();
+  const ctx = { gen, seenGlobal: new Set() };
   const blocks = sections.map((s) => {
-    const div = document.createElement("div");
+    const div = document.createElement("section");
     div.className = "section";
-    div.innerHTML = `<h2>${escapeHtml(s.label)}</h2><div class="skel"></div><div class="skel"></div><div class="skel"></div>`;
-    feed.appendChild(div);
+    body.appendChild(div);
+    skeleton(div, s);
     return div;
   });
-
-  await Promise.all(sections.map(async (s, i) => {
-    try {
-      const items = await fetchSection(s.query, s.days);
-      renderSection(blocks[i], s, items, seenGlobal);
-    } catch (e) {
-      blocks[i].innerHTML = `<h2>${escapeHtml(s.label)}</h2><div class="error">Couldn't load this topic right now — tap ↻ in a minute.</div>`;
-    }
-  }));
-
-  enrichCards();
+  await Promise.all(sections.map((s, i) => runSection(blocks[i], s, ctx)));
 }
 
-async function fetchSection(query, days) {
-  const d = Math.min(7, Math.max(1, days || 2));
-  const r = await fetch("/api/feed?q=" + encodeURIComponent(query) + "&d=" + d);
-  if (!r.ok) throw new Error("feed " + r.status);
-  const xml = await r.text();
+function sectionHead(block, section) {
+  block.innerHTML = "";
+  const h = document.createElement("h2");
+  h.textContent = section.label;
+  block.appendChild(h);
+}
+function skeleton(block, section) {
+  sectionHead(block, section);
+  const sheet = document.createElement("div");
+  sheet.className = "sheet";
+  sheet.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+  block.appendChild(sheet);
+}
+
+async function runSection(block, section, ctx) {
+  let result = null, failed = false;
+  try { result = await loadSection(section, ctx); } catch (e) { failed = true; }
+  if (ctx.gen !== feedGen) return; // the feed was rebuilt while this was loading
+  if (failed) {
+    sectionHead(block, section);
+    const err = document.createElement("div");
+    err.className = "empty error";
+    err.innerHTML = "<span>Couldn't reach the news sources. Check your connection, then try again.</span>";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "small-btn";
+    retry.textContent = "Try again";
+    retry.onclick = () => { skeleton(block, section); runSection(block, section, ctx); };
+    err.appendChild(retry);
+    block.appendChild(err);
+    return;
+  }
+  renderSection(block, section, result, ctx);
+}
+
+const MIN_STORIES = 3; // fewer than this and the section looks further afield
+
+/* Fetch a section, widening the time window (and adding the backup source)
+   until there's something worth showing. Throws only when no source answered. */
+async function loadSection(section, ctx) {
+  let google = null, googleDown = false, bing = null, bingTried = false;
+  let kept = [], days = section.ladder[0];
+  for (const d of section.ladder) {
+    days = d;
+    if (!googleDown) {
+      try { google = await fetchFeed("g", section.query, d); }
+      catch (e) { googleDown = true; google = null; }
+    }
+    kept = pick(google || [], section, d, ctx);
+    const thin = kept.length < MIN_STORIES;
+    if ((googleDown || (thin && section.kind === "custom")) && !bingTried) {
+      bingTried = true;
+      try { bing = await fetchFeed("b", section.query, 0); } catch (e) { bing = null; }
+    }
+    if (bing && (googleDown || thin)) kept = pick((google || []).concat(bing), section, d, ctx);
+    if (kept.length >= MIN_STORIES) break;
+  }
+  if (googleDown && !bing) throw new Error("no source answered");
+  return { kept, days };
+}
+
+async function fetchFeed(source, query, days) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const r = await fetch(
+      "/api/feed?q=" + encodeURIComponent(query) + "&d=" + days + (source === "b" ? "&s=b" : ""),
+      { signal: ctrl.signal }
+    );
+    if (!r.ok) throw new Error("feed " + r.status);
+    const xml = await r.text();
+    const items = source === "b" ? parseBing(xml) : parseGoogle(xml);
+    for (const it of items) {
+      if (it.date && isNaN(it.date)) it.date = null;
+      it.hay = (it.title + " | " + it.src + " | " + it.desc).replace(/[’‘]/g, "'");
+    }
+    items.sort((a, b) => (b.date || 0) - (a.date || 0));
+    return items;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function stripTags(html) {
+  return html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function parseGoogle(xml) {
   const doc = new DOMParser().parseFromString(xml, "text/xml");
+  if (doc.querySelector("parsererror") || !doc.querySelector("rss")) throw new Error("bad feed");
   const items = [];
   for (const item of doc.querySelectorAll("item")) {
     let title = text(item, "title");
@@ -428,96 +694,219 @@ async function fetchSection(query, days) {
     const pub = text(item, "pubDate");
     // Google News titles end with " - Source"; trim it since we show source separately
     if (src && title.endsWith(" - " + src)) title = title.slice(0, -(src.length + 3));
-    if (title && link) items.push({ title, link, src, date: pub ? new Date(pub) : null });
+    if (title && /^https?:\/\//i.test(link)) {
+      items.push({ title, link, src, date: pub ? new Date(pub) : null, desc: stripTags(text(item, "description")), from: "g" });
+    }
   }
-  items.sort((a, b) => (b.date || 0) - (a.date || 0));
   return items;
 }
 
-function renderSection(block, section, items, seenGlobal) {
+function decodeEntities(s) {
+  const named = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
+    if (e[0] === "#") {
+      const code = e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      return code > 0 && code < 0x110000 ? String.fromCodePoint(code) : "";
+    }
+    return Object.prototype.hasOwnProperty.call(named, e.toLowerCase()) ? named[e.toLowerCase()] : m;
+  });
+}
+
+/* Bing's feed is read with plain text matching rather than an XML parser, so a
+   quirk in its markup can't take the whole backup source down. */
+function parseBing(xml) {
+  if (!/<rss[\s>]/i.test(xml)) throw new Error("bad feed");
+  const items = [];
+  for (const block of xml.match(/<item\b[\s\S]*?<\/item>/gi) || []) {
+    const tag = (name) => {
+      const m = block.match(new RegExp("<" + name + "\\b[^>]*>([\\s\\S]*?)</" + name + ">", "i"));
+      if (!m) return "";
+      return decodeEntities(m[1].replace(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/, "$1")).trim();
+    };
+    const title = stripTags(tag("title"));
+    let link = tag("link");
+    try {
+      const real = new URL(link).searchParams.get("url"); // Bing wraps the article link in a click-tracker
+      if (real && /^https?:\/\//i.test(real)) link = real;
+    } catch (e) {}
+    if (!title || !/^https?:\/\//i.test(link)) continue;
+    const pub = tag("pubDate");
+    const image = tag("News:Image").replace(/^http:/i, "https:");
+    items.push({
+      title, link, src: stripTags(tag("News:Source")), date: pub ? new Date(pub) : null,
+      desc: stripTags(decodeEntities(tag("description"))),
+      image: /^https:\/\//i.test(image) ? image : null, from: "b",
+    });
+  }
+  return items;
+}
+
+/* Choose the on-topic, not-hidden, not-muted stories inside the time window. */
+function pick(items, section, days, ctx) {
+  const now = Date.now();
+  const maxAge = (days > 0 ? days : 365) * 864e5;
   const muted = settings.muteOn ? settings.muteWords.map((w) => w.toLowerCase()) : [];
   const hidden = new Set(settings.hiddenKeys);
+  const seen = new Set();
   const kept = [];
   for (const it of items) {
+    if (it.date && (now - it.date.getTime() > maxAge || it.date.getTime() - now > 864e5)) continue;
     const key = keyOf(it.title);
-    if (seenGlobal.has(key)) continue;
-    if (hidden.has(key)) continue;
-    if (muted.some((w) => it.title.toLowerCase().includes(w))) continue;
-    // the headline must actually mention the topic — Google pads with "related" stories
-    if (section.match && section.match.length && !titleHas(it.title, section.match)) continue;
+    const dkey = key.slice(0, 60);
+    if (!key || seen.has(dkey) || ctx.seenGlobal.has(dkey) || hidden.has(key)) continue;
+    const lowTitle = it.title.toLowerCase();
+    if (muted.some((w) => lowTitle.includes(w))) continue;
+    // the story must actually mention the topic — search engines pad with "related" stories
+    const hits = groupsHit(it.hay, section.groups);
+    if (hits < section.need) continue;
     const brake = hitCount(it.title, settings.brakes);
     if (brake >= 2) continue; // clearly the kind of story they said "less of"
-    seenGlobal.add(key);
-    // `prefer` terms (e.g. saltwater signals in the fly-fishing topic) outrank everything
-    const preferred = section.prefer && titleHas(it.title, section.prefer) ? 3 : 0;
-    kept.push({ ...it, score: preferred + hitCount(it.title, settings.boosts) - brake });
-    if (kept.length >= 20) break;
+    seen.add(dkey);
+    const preferred = section.prefer.length && anyTerm(it.hay, section.prefer) ? 3 : 0;
+    const complete = section.groups.length > 1 && hits === section.groups.length ? 2 : 0;
+    kept.push({ ...it, key, dkey, score: preferred + complete + hitCount(it.title, settings.boosts) - brake });
+    if (kept.length >= 24) break;
   }
   kept.sort((a, b) => b.score - a.score || (b.date || 0) - (a.date || 0));
-  const show = kept.slice(0, 8);
+  return kept;
+}
+
+function renderSection(block, section, result, ctx) {
+  // a story already shown in an earlier section isn't repeated
+  const fresh = result.kept.filter((it) => !ctx.seenGlobal.has(it.dkey));
+  const show = fresh.slice(0, result.days === 0 ? 5 : 8);
+  for (const it of show) ctx.seenGlobal.add(it.dkey);
   latestBySection[section.label] = show;
 
-  block.innerHTML = `<h2>${escapeHtml(section.label)}</h2>`;
+  sectionHead(block, section);
   if (show.length === 0) {
-    block.innerHTML += '<div class="empty">Nothing on this topic right now.</div>';
+    const none = document.createElement("div");
+    none.className = "empty";
+    none.textContent = section.kind === "custom"
+      ? "No stories on this in the past year. A shorter keyword usually finds more."
+      : "Nothing new on this in the past week.";
+    block.appendChild(none);
     return;
   }
-  for (const it of show) block.appendChild(makeCard(it));
+  // say so when a quiet topic had to look further back than usual
+  const oldest = Math.max(0, ...show.map((it) => (it.date ? (Date.now() - it.date.getTime()) / 864e5 : 0)));
+  if (oldest > section.ladder[0] + 0.5) {
+    const note = document.createElement("p");
+    note.className = "note";
+    note.textContent = oldest > 30 ? "Quiet topic. These are the latest stories from the past year."
+      : oldest > 7 ? "Quiet week. Showing the past month."
+      : "Quiet couple of days. Showing the past week.";
+    block.appendChild(note);
+  }
+  const sheet = document.createElement("div");
+  sheet.className = "sheet";
+  show.forEach((it, i) => sheet.appendChild(makeCard(it, i === 0)));
+  block.appendChild(sheet);
 }
 
-/* ---------- cards + swipe (left = remove, right = more/less) ---------- */
+/* ---------- story cards + swipe (left = hide, right = more/less) ---------- */
 
-let openWrap = null; // the card currently slid open, if any
+const KEBAB = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 
-function closeOpen() {
-  if (!openWrap) return;
-  const card = openWrap.querySelector(".card");
-  if (card) { card.style.transition = "transform .18s ease"; card.style.transform = ""; }
-  openWrap = null;
-}
-
-function makeCard(it) {
+function makeCard(it, lead) {
   const wrap = document.createElement("div");
-  wrap.className = "cardwrap";
+  wrap.className = "cardwrap" + (lead ? " lead" : "");
   wrap.innerHTML = `
-    <div class="under under-left" aria-hidden="true"><span>Remove ✕</span></div>
-    <div class="under under-right">
-      <button class="more-btn">👍 More like this</button>
-      <button class="less-btn">👎 Less like this</button>
+    <div class="under under-left" aria-hidden="true"><span>Hide</span></div>
+    <div class="under under-right" aria-hidden="true"><span>More or less like this</span></div>
+    <div class="card">
+      <div class="txt">
+        <a class="headline" target="_blank" rel="noopener noreferrer" draggable="false"></a>
+        <div class="meta"><span class="src"></span><span class="when"></span>
+          <button type="button" class="kebab" aria-label="Options for this story" aria-expanded="false">${KEBAB}</button></div>
+        <div class="acts" hidden>
+          <button type="button" class="act more">More like this</button>
+          <button type="button" class="act less">Less like this</button>
+          <button type="button" class="act hide">Hide</button>
+        </div>
+      </div>
     </div>`;
+  const card = wrap.querySelector(".card");
+  const head = wrap.querySelector(".headline");
+  head.textContent = it.title;
+  head.href = it.link;
+  wrap.dataset.href = it.link;
+  wrap.querySelector(".src").textContent = it.src || "News";
+  wrap.querySelector(".when").textContent = relTime(it.date);
 
-  const a = document.createElement("a");
-  a.className = "card";
-  a.href = it.link;
-  a.target = "_blank";
-  a.rel = "noopener";
-  a.dataset.gnlink = it.link;
-  a.innerHTML = `<div class="txt">
-      <div class="headline">${escapeHtml(it.title)}</div>
-      <div class="meta"><span class="src">${escapeHtml(it.src || "News")}</span> · ${relTime(it.date)}</div>
-    </div>`;
-  wrap.appendChild(a);
-
-  wrap.querySelector(".more-btn").onclick = () => {
+  const kebab = wrap.querySelector(".kebab");
+  const acts = wrap.querySelector(".acts");
+  const toggleActs = (open) => {
+    acts.hidden = open === undefined ? !acts.hidden : !open;
+    kebab.setAttribute("aria-expanded", acts.hidden ? "false" : "true");
+  };
+  kebab.onclick = () => toggleActs();
+  wrap.querySelector(".more").onclick = () => {
     remember(settings.boosts, learnWords(it.title), 100);
     save();
-    closeOpen();
-    toast("👍 Got it — more like this");
+    toggleActs(false);
+    toast("More like this, noted");
   };
-  wrap.querySelector(".less-btn").onclick = () => {
+  wrap.querySelector(".less").onclick = () => {
     remember(settings.brakes, learnWords(it.title), 100);
     save();
     removeStory(wrap, it);
-    toast("👎 Noted — less like this");
+    toast("Less like this, noted");
   };
+  wrap.querySelector(".hide").onclick = () => { removeStory(wrap, it); toast("Story hidden"); };
 
-  attachSwipe(wrap, a, it);
+  if (it.from === "b") {
+    // the backup source hands over the real link, a summary and a picture up front
+    addSummary(wrap, cleanSummary(it.desc));
+    if (it.image) addImage(wrap, it.image);
+  } else {
+    wrap.dataset.gnlink = it.link;
+    watchForPreview(wrap);
+  }
+
+  attachSwipe(wrap, card, it, toggleActs);
   return wrap;
 }
 
-function attachSwipe(wrap, card, it) {
-  const REVEAL = 150; // px the card slides right to show the more/less buttons
-  let startX = 0, startY = 0, dx = 0, active = false, horiz = null, moved = false, wasOpen = false;
+function addSummary(wrap, summary) {
+  if (!summary || wrap.querySelector(".summary")) return;
+  const s = document.createElement("div");
+  s.className = "summary";
+  s.textContent = summary;
+  wrap.querySelector(".txt").insertBefore(s, wrap.querySelector(".meta"));
+}
+
+function addImage(wrap, src) {
+  if (!/^https:\/\//i.test(src) || wrap.querySelector(".thumb")) return;
+  const a = document.createElement("a");
+  a.className = "thumb";
+  a.href = wrap.dataset.href;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.tabIndex = -1;
+  a.draggable = false;
+  a.setAttribute("aria-hidden", "true");
+  const img = document.createElement("img");
+  img.loading = "lazy";
+  img.alt = "";
+  img.draggable = false;
+  img.referrerPolicy = "no-referrer";
+  img.onerror = () => { a.remove(); wrap.classList.remove("wide"); };
+  // the first story of a section gets a full-width picture when it's big enough to carry it
+  img.onload = () => { if (wrap.classList.contains("lead") && img.naturalWidth >= 480) wrap.classList.add("wide"); };
+  img.src = src;
+  a.appendChild(img);
+  wrap.querySelector(".card").appendChild(a);
+}
+
+function setHref(wrap, url) {
+  if (!/^https?:\/\//i.test(url)) return;
+  wrap.dataset.href = url;
+  for (const a of wrap.querySelectorAll("a")) a.href = url;
+}
+
+function attachSwipe(wrap, card, it, toggleActs) {
+  let startX = 0, startY = 0, dx = 0, active = false, horiz = null, moved = false;
 
   const setX = (x, anim) => {
     card.style.transition = anim ? "transform .18s ease" : "none";
@@ -525,11 +914,9 @@ function attachSwipe(wrap, card, it) {
   };
 
   card.addEventListener("pointerdown", (e) => {
-    if (e.button) return;
+    if (e.button || e.target.closest("button")) return;
     startX = e.clientX; startY = e.clientY;
     dx = 0; horiz = null; active = true; moved = false;
-    wasOpen = openWrap === wrap;
-    if (openWrap && openWrap !== wrap) closeOpen();
   });
   card.addEventListener("pointermove", (e) => {
     if (!active) return;
@@ -539,44 +926,60 @@ function attachSwipe(wrap, card, it) {
     if (horiz) {
       try { card.setPointerCapture(e.pointerId); } catch (err) {}
       moved = true;
-      dx = Math.max(-160, Math.min(REVEAL + 20, mx + (wasOpen ? REVEAL : 0)));
+      card.classList.add("dragging");
+      dx = Math.max(-160, Math.min(120, mx));
       setX(dx, false);
     }
   });
   const finish = () => {
+    card.classList.remove("dragging");
     if (!active) return;
     active = false;
     if (dx < -70) {
       removeStory(wrap, it);
       toast("Story hidden");
-    } else if (dx > 70) {
-      setX(REVEAL, true);
-      openWrap = wrap;
     } else {
       setX(0, true);
-      if (openWrap === wrap) openWrap = null;
+      if (dx > 70) toggleActs(true);
     }
     dx = 0;
   };
   card.addEventListener("pointerup", finish);
-  card.addEventListener("pointercancel", () => { active = false; dx = 0; setX(0, true); if (openWrap === wrap) openWrap = null; });
+  card.addEventListener("pointercancel", () => { card.classList.remove("dragging"); active = false; dx = 0; setX(0, true); });
   card.addEventListener("click", (e) => {
-    // a swipe or a tap on an open card shouldn't open the article
-    if (moved || wasOpen) { e.preventDefault(); if (wasOpen && !moved) closeOpen(); }
-  });
+    // a swipe that ends over the headline mustn't open the article
+    if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; return; }
+    // tapping anywhere on the story (not just the headline) opens it
+    if (e.target.closest("a, button")) return;
+    window.open(wrap.dataset.href, "_blank", "noopener,noreferrer");
+  }, true);
 }
 
 function removeStory(wrap, it) {
   remember(settings.hiddenKeys, [keyOf(it.title)], 500);
   save();
-  if (openWrap === wrap) openWrap = null;
   for (const arr of Object.values(latestBySection)) {
     const i = arr.indexOf(it);
     if (i >= 0) arr.splice(i, 1);
   }
+  const sheet = wrap.parentElement;
   wrap.style.height = wrap.offsetHeight + "px";
   requestAnimationFrame(() => wrap.classList.add("gone"));
-  setTimeout(() => wrap.remove(), 380);
+  setTimeout(() => {
+    wrap.remove();
+    if (!sheet) return;
+    const first = sheet.querySelector(".cardwrap");
+    if (first) {
+      first.classList.add("lead"); // the next story steps up
+      const img = first.querySelector(".thumb img");
+      if (img && img.naturalWidth >= 480) first.classList.add("wide");
+    } else {
+      const none = document.createElement("div");
+      none.className = "empty";
+      none.textContent = "That's all for this topic.";
+      sheet.replaceWith(none);
+    }
+  }, 380);
 }
 
 let toastTimer = null;
@@ -585,54 +988,53 @@ function toast(msg) {
   if (!el) {
     el = document.createElement("div");
     el.id = "toast";
+    el.setAttribute("role", "status");
     document.body.appendChild(el);
   }
   el.textContent = msg;
   el.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), 1800);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
 }
 
-/* Progressively add pictures + opening lines to the cards.
-   Runs after the headlines are already on screen, a few at a time. */
-async function enrichCards() {
-  const cards = Array.from(document.querySelectorAll(".card[data-gnlink]"));
-  const queue = cards.slice();
-  const WORKERS = 4;
+/* ---------- pictures + opening lines ----------
+   Added a few at a time, and only for stories that are on (or near) the screen,
+   so a long feed doesn't fetch previews nobody scrolls to. */
 
-  async function worker() {
-    while (queue.length) {
-      const card = queue.shift();
-      if (!card || !document.body.contains(card)) continue;
-      try {
-        const r = await fetch("/api/preview?u=" + encodeURIComponent(card.dataset.gnlink));
-        const p = await r.json();
-        if (!document.body.contains(card)) continue;
-        if (p.url) card.href = p.url; // link straight to the article
-        p.summary = cleanSummary(p.summary);
-        if (p.summary) {
-          const txt = card.querySelector(".txt");
-          const meta = card.querySelector(".meta");
-          if (txt && meta && !card.querySelector(".summary")) {
-            const s = document.createElement("div");
-            s.className = "summary";
-            s.textContent = p.summary;
-            txt.insertBefore(s, meta);
-          }
-        }
-        if (p.image && !card.querySelector(".thumb")) {
-          const img = document.createElement("img");
-          img.className = "thumb";
-          img.loading = "lazy";
-          img.alt = "";
-          img.src = p.image;
-          img.onerror = () => img.remove();
-          card.appendChild(img);
-        }
-      } catch (e) { /* preview is a bonus — skip on failure */ }
-    }
+const previewQueue = [];
+let previewWorkers = 0;
+const previewWatch = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        if (!en.isIntersecting) continue;
+        previewWatch.unobserve(en.target);
+        queuePreview(en.target);
+      }
+    }, { rootMargin: "700px 0px" })
+  : null;
+
+function watchForPreview(wrap) {
+  if (previewWatch) previewWatch.observe(wrap);
+  else queuePreview(wrap);
+}
+function queuePreview(wrap) {
+  previewQueue.push(wrap);
+  while (previewWorkers < 4 && previewQueue.length) { previewWorkers++; previewWorker(); }
+}
+async function previewWorker() {
+  while (previewQueue.length) {
+    const wrap = previewQueue.shift();
+    if (!wrap || !document.body.contains(wrap)) continue;
+    try {
+      const r = await fetch("/api/preview?u=" + encodeURIComponent(wrap.dataset.gnlink));
+      const p = await r.json();
+      if (!document.body.contains(wrap)) continue;
+      if (p.url) setHref(wrap, p.url); // link straight to the article
+      addSummary(wrap, cleanSummary(p.summary));
+      if (p.image) addImage(wrap, p.image);
+    } catch (e) { /* preview is a bonus — skip on failure */ }
   }
-  await Promise.all(Array.from({ length: WORKERS }, worker));
+  previewWorkers--;
 }
 
 /* Some sites put junk (cookie walls, share bars) in their description field. */
@@ -658,7 +1060,9 @@ function relTime(d) {
   const hrs = Math.round(mins / 60);
   if (hrs < 24) return hrs + (hrs === 1 ? " hour ago" : " hours ago");
   const days = Math.round(hrs / 24);
-  return days + (days === 1 ? " day ago" : " days ago");
+  if (days < 14) return days + (days === 1 ? " day ago" : " days ago");
+  if (days < 60) return Math.round(days / 7) + " weeks ago";
+  return Math.round(days / 30) + " months ago";
 }
 
 /* ---------- read it to me ---------- */
@@ -666,7 +1070,7 @@ function relTime(d) {
 function speakFeed() {
   if (speaking) { stopSpeaking(); return; }
   const synth = window.speechSynthesis;
-  if (!synth) { alert("Sorry — this device can't read aloud."); return; }
+  if (!synth) { toast("This device can't read aloud."); return; }
 
   const name = settings.name ? ", " + settings.name : "";
   const parts = ["Here's your news" + name + "."];
@@ -675,13 +1079,14 @@ function speakFeed() {
     parts.push(label + ".");
     items.slice(0, 4).forEach((it) => parts.push(it.title + ". From " + (it.src || "the news") + "."));
   }
-  if (parts.length === 1) { alert("Nothing loaded to read yet — refresh first."); return; }
+  if (parts.length === 1) { toast("Nothing loaded to read yet. Refresh first."); return; }
   parts.push("That's the wrap. Have a good one.");
   speakParts(parts);
 }
 
 function speakParts(parts) {
   const synth = window.speechSynthesis;
+  if (!synth) { toast("This device can't read aloud."); return; }
   const voice = chosenVoice();
   speaking = true;
   $("btn-listen").classList.add("speaking");
@@ -702,27 +1107,101 @@ function stopSpeaking() {
   if (b) b.classList.remove("speaking");
 }
 
-/* ---------- share ---------- */
+/* ---------- share the app / carry a setup to another device ---------- */
 
-async function shareApp() {
-  const data = {
-    title: "My News",
-    text: "Free news app — pick your own topics and keywords. No sign-up.",
-    url: location.origin + location.pathname,
-  };
+async function copyOrShare(data, copiedMsg) {
   if (navigator.share) {
-    try { await navigator.share(data); } catch (e) {}
-  } else {
-    try {
-      await navigator.clipboard.writeText(data.url);
-      alert("Link copied — paste it to a mate!");
-    } catch (e) { alert("Share this link: " + data.url); }
+    try { await navigator.share(data); return; } catch (e) { if (e && e.name === "AbortError") return; }
   }
+  try {
+    await navigator.clipboard.writeText(data.url);
+    toast(copiedMsg);
+  } catch (e) {
+    window.prompt("Copy this link:", data.url);
+  }
+}
+
+function shareApp() {
+  copyOrShare({
+    title: "My News",
+    text: "Free news app. Pick your own topics and keywords. No sign-up.",
+    url: location.origin + location.pathname,
+  }, "Link copied. Paste it to a mate.");
+}
+
+/* The setup link carries topics, keywords, blocked words and the look in the
+   part of the address after "#", which browsers never send to any server. */
+function setupLink() {
+  const data = { p: settings.presetIds, k: settings.customKeywords, m: settings.muteWords, mo: settings.muteOn ? 1 : 0, t: settings.theme };
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return location.origin + location.pathname + "#setup=" + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function readSetupLink() {
+  const m = location.hash.match(/^#setup=([A-Za-z0-9_-]+)$/);
+  if (!m) return null;
+  try {
+    const bin = atob(m[1].replace(/-/g, "+").replace(/_/g, "/"));
+    const data = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+    const strings = (a, max, len) => (Array.isArray(a) ? a : [])
+      .filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim().slice(0, len)).slice(0, max);
+    return {
+      presetIds: strings(data.p, 20, 20).filter((id) => PRESETS.some((p) => p.id === id)),
+      customKeywords: strings(data.k, 40, 200),
+      muteWords: strings(data.m, 60, 60),
+      muteOn: !!data.mo,
+      theme: THEMES.some((t) => t.id === data.t) ? data.t : null,
+    };
+  } catch (e) { return null; }
+}
+
+function offerSetup(incoming) {
+  const n = incoming.presetIds.length + incoming.customKeywords.length;
+  const box = document.createElement("div");
+  box.className = "modal";
+  box.innerHTML = `<div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-h">
+      <h2 id="modal-h">Load this setup?</h2>
+      <p></p>
+      <ul></ul>
+      <div class="modal-btns">
+        <button type="button" class="small-btn ghost" data-act="keep">Keep mine</button>
+        <button type="button" class="small-btn" data-act="use">Load setup</button>
+      </div>
+    </div>`;
+  box.querySelector("p").textContent =
+    `This link carries ${n} topic${n === 1 ? "" : "s"}. Loading it replaces the topics, keywords and blocked words on this device.`;
+  const ul = box.querySelector("ul");
+  const names = incoming.presetIds.map((id) => PRESETS.find((p) => p.id === id).label)
+    .concat(incoming.customKeywords.map((k) => parseKeyword(k).label));
+  for (const name of names.slice(0, 14)) {
+    const li = document.createElement("li");
+    li.textContent = name;
+    ul.appendChild(li);
+  }
+  const close = () => { box.remove(); history.replaceState(null, "", location.pathname + location.search); };
+  box.querySelector('[data-act="keep"]').onclick = close;
+  box.querySelector('[data-act="use"]').onclick = () => {
+    settings.presetIds = incoming.presetIds;
+    settings.customKeywords = incoming.customKeywords;
+    settings.muteWords = incoming.muteWords;
+    settings.muteOn = incoming.muteOn;
+    if (incoming.theme) settings.theme = incoming.theme;
+    settings.onboarded = true;
+    save();
+    close();
+    applyLook();
+    showFeed();
+    toast("Setup loaded");
+  };
+  document.body.appendChild(box);
+  box.querySelector('[data-act="use"]').focus();
 }
 
 /* ---------- wire up ---------- */
 
-$("kw-add").onclick = () => addFromInput("kw-input", settings.customKeywords, renderCustomChips);
+$("kw-add").onclick = () => addFromInput("kw-input", settings.customKeywords, renderCustomChips, 200);
 $("kw-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("kw-add").click(); });
 $("mute-add").onclick = () => addFromInput("mute-input", settings.muteWords, renderMuteChips);
 $("mute-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("mute-add").click(); });
@@ -751,6 +1230,7 @@ $("btn-done").onclick = () => {
   settings.onboarded = true;
   save();
   showFeed();
+  window.scrollTo(0, 0);
 };
 
 $("swipe-reset").onclick = () => {
@@ -758,8 +1238,10 @@ $("swipe-reset").onclick = () => {
   settings.boosts = [];
   settings.brakes = [];
   save();
-  toast("Swipe training cleared — fresh start");
+  toast("Learning cleared. Fresh start.");
 };
+
+$("setup-copy").onclick = () => copyOrShare({ title: "My News setup", url: setupLink() }, "Setup link copied");
 
 $("btn-settings").onclick = () => showSetup(true);
 $("btn-refresh").onclick = () => buildFeed();
@@ -774,6 +1256,13 @@ if (window.speechSynthesis) {
   };
 }
 
+// "Auto" look follows the device as it flips between light and dark
+if (darkQuery) {
+  const onFlip = () => { if (settings.theme === "auto") applyLook(); };
+  if (darkQuery.addEventListener) darkQuery.addEventListener("change", onFlip);
+  else if (darkQuery.addListener) darkQuery.addListener(onFlip);
+}
+
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
@@ -781,3 +1270,6 @@ if ("serviceWorker" in navigator && location.protocol === "https:") {
 applyLook();
 if (settings.onboarded && activeSections().length > 0) showFeed();
 else showSetup(false);
+
+const incomingSetup = readSetupLink();
+if (incomingSetup) offerSetup(incomingSetup);
