@@ -88,7 +88,7 @@ Stored as plain strings in `settings.customKeywords`, so old keywords keep worki
 | `yellowcheek / yellow cheek` | slash (with spaces) = either-or |
 | `Lake Murray, PNG / Papua` | comma = must-have-both, every part required |
 | `fly tying [streamer]` | brackets float matching stories to the top, but aren't required |
-| `Bensbach, -Road` | a leading minus leaves out stories with that word |
+| `Bensbach, -Road` | a leading minus leaves out stories with that word in the headline or summary. It is not sent to Google: Google would also drop stories that only use the word in the article body |
 | `F-150, Australia` | Australian stories only (see below) |
 | `NT grants: NT, grant / funding` | `Name: ` prefix = short section name |
 | anything with `( )` | passed to Google untouched (legacy) |
@@ -102,7 +102,7 @@ In plain keywords `nt`, `png`, `qld` etc. expand to their full names, and
 
 "Australia" is special. A story counts as mentioning it when it says so, or
 when its publisher is Australian: site ending `.au`, "australia" in the site
-name, or listed in `AU_HOSTS`. It is sent to Google as a search word only from
+name, or listed in `AU_HOSTS` (Australian sites on a plain `.com` / `.io`: add to it when one turns up). It is sent to Google as a search word only from
 square brackets.
 
 `RETUNE` in `app.js` is a one-off map that swaps Glenn's six dead keywords (and

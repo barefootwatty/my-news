@@ -156,10 +156,12 @@ One commit of code on top of `f92ded1`, plus this file.
 - **Keywords match on headline and description only.** The publisher's name is
   stripped from Google's description. Presets still count the publisher's name,
   which is what lets "Fishing World" stories through the Fishing filter.
-- **`-word` leaves stories out.** `Bensbach, -Road, -Glenfield`.
+- **`-word` leaves stories out.** `Bensbach, -Road, -Glenfield`. Applied to the headline in the app only.
+  It is no longer sent to Google (changed 24 Nov in Claude Code): `-Road` in the search hid the one real
+  Bensbach story, because the article body mentions a road.
 - **"Australia" as a must-have part is met by an Australian publisher.** A site
   ending in `.au`, a site with "australia" in its name, or one listed in
-  `AU_HOSTS` (currently just `miragenews.com`). It is not sent to Google as a
+  `AU_HOSTS` (`miragenews.com`, `torquecafe.com`, `thedriven.io`). It is not sent to Google as a
   search word unless it's in square brackets.
 - **Rare single-term keywords fall back to Google's own match.** If a keyword
   has one part, still has fewer than 3 stories, and Google found 25 or fewer
@@ -183,9 +185,9 @@ against real ones. A Vercel preview of the code commit was built but never opene
 
 | Section | Rule (as stored) | Sent to Google | Sent to Bing |
 |---|---|---|---|
-| Yellowcheek | `yellowcheek / yellow cheek carp / Elopichthys, -darter` | `(yellowcheek OR "yellow cheek carp" OR Elopichthys) -darter` | `yellowcheek` |
-| NT business grants | `Northern Territory / NT / Territory / Territorian / Darwin, grant / funding / voucher / rebate, Australia [business]` | `("Northern Territory" OR NT OR Territory OR Territorian OR Darwin) (grant OR funding OR voucher OR rebate)` | `Northern Territory grant` |
-| Bensbach | `Bensbach, -Road, -Glenfield` | `Bensbach -Road -Glenfield` | `Bensbach` |
+| Yellowcheek | `yellowcheek / yellow cheek carp / Elopichthys, -darter` | `(yellowcheek OR "yellow cheek carp" OR Elopichthys)` | `yellowcheek` |
+| NT business grants | `Northern Territory / NT / Territory / Territorian / Darwin / Alice Springs / Katherine / Top End, grant / funding / voucher / rebate, business / tourism / operator / fishing, Australia, -Morning Mail` | the three bracketed OR groups (place, money, business) | `Northern Territory grant business` |
+| Bensbach | `Bensbach, -Road, -Glenfield` | `Bensbach` | `Bensbach` |
 | Lake Murray PNG | `Lake Murray, PNG / Papua New Guinea / Papua / Western Province / black bass` | `"Lake Murray" (PNG OR "Papua New Guinea" OR Papua OR "Western Province" OR "black bass")` | `Lake Murray PNG` |
 | Fly tying | `fly tying / fly tier / fly pattern [streamer / clouser / deceiver / baitfish]` | `("fly tying" OR "fly tier" OR "fly pattern")` | `fly tying` |
 | AFANT | `AFANT / Amateur Fishermen's Association of the NT / Amateur Fishermen's Association of the Northern Territory` | the same three, joined with OR | `AFANT` |
@@ -225,6 +227,24 @@ location.reload();
 ```
 
 ---
+
+## 7a. Real-feed run, 24 Nov 2026 (Claude Code, Glenn's Mac)
+
+Run with `dev_server.py` and the section 7 snippet. Offline tests pass before and after.
+
+- **Top End, Fishing, Fly Fishing, Lake Murray, Fly tying, F-150:** on-topic. F-150 is all Australian.
+- **Good News:** Australian-only works. A few weak ones remain (a cricket story, "good news" used loosely).
+- **Yellowcheek:** empty, which is true.
+- **Bensbach:** was empty. Now shows the one body-mention story (11 months old; it drops off in mid-December).
+- **NT business grants:** was heritage grants, road funding and hospital funding. A business word is now
+  required. Shows 2 stories from the past year. Real NT business-grant headlines are that rare.
+- **AFANT:** 2 real AFANT stories plus 3 fallback stories, all the same NT croc-versus-fisherman story.
+- **Pictures and summaries:** working. 35 of 52 stories had a picture, 49 of 52 linked straight to the
+  article. NT News and The Australian block the preview fetch, so their stories show headline only.
+- A non-breaking hyphen (`F‑150`) is now read as a plain one.
+- No Node on the Mac: the offline test server was run with the Node bundled inside the Python
+  `playwright` package (`…/site-packages/playwright/driver/node`), in a throwaway venv, with `CHROME` set
+  to the installed Google Chrome.
 
 ## 8. Decisions already made
 

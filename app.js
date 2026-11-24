@@ -78,7 +78,7 @@ const DEFAULTS = {
    feeds. Keys are lower-case, single-spaced. */
 const TUNED = {
   yellowcheek: "Yellowcheek: yellowcheek / yellow cheek carp / Elopichthys, -darter",
-  grants: "NT business grants: Northern Territory / NT / Territory / Territorian / Darwin, grant / funding / voucher / rebate, Australia [business]",
+  grants: "NT business grants: Northern Territory / NT / Territory / Territorian / Darwin / Alice Springs / Katherine / Top End, grant / funding / voucher / rebate, business / tourism / operator / fishing, Australia, -Morning Mail",
   bensbach: "Bensbach, -Road, -Glenfield",
   murray: "Lake Murray PNG: Lake Murray, PNG / Papua New Guinea / Papua / Western Province / black bass",
   tying: "Fly tying: fly tying / fly tier / fly pattern [streamer / clouser / deceiver / baitfish]",
@@ -451,8 +451,9 @@ function parseKeyword(raw) {
     let asked = groups.filter((g) => !g.every(isCtx));
     if (!asked.length) asked = groups;
     const steer = prefer.filter(isCtx);
-    const query = (asked.map(orJoin).join(" ") + (steer.length ? " " + orJoin(steer) : "") +
-      not.map((t) => " -" + q(t)).join("")).slice(0, 280);
+    // "-words" are not sent to the search: Google would also drop stories that only use the word
+    // somewhere in the article ("-Road" hid the one real Bensbach story). They are applied to the headline here.
+    const query = (asked.map(orJoin).join(" ") + (steer.length ? " " + orJoin(steer) : "")).slice(0, 280);
     // Bing's feed returns nothing for OR / brackets / quotes, so it gets plain words: the first of each part
     const bing = asked.map((g) => g[0]).concat(steer.slice(0, 1)).join(" ").slice(0, 120);
     out = {
@@ -732,7 +733,8 @@ async function fetchFeed(source, query, days) {
     for (const it of items) {
       if (it.date && isNaN(it.date)) it.date = null;
       // an Australian publisher counts as "mentions Australia" (see the keyword notes)
-      const body = (it.title + " | " + it.desc + (it.au ? " | Australia" : "")).replace(/[’‘]/g, "'");
+      // odd hyphens (F‑150 with a non-breaking hyphen) are read as plain ones
+      const body = (it.title + " | " + it.desc + (it.au ? " | Australia" : "")).replace(/[’‘]/g, "'").replace(/[\u2010\u2011]/g, "-");
       it.hay = body;                          // what a keyword is tested against
       it.hayWide = body + " | " + it.src;     // presets also count the publisher's name ("Fishing World")
     }
@@ -749,7 +751,7 @@ function stripTags(html) {
 
 /* Is this an Australian publisher? Web address ends in .au, or has "australia" in it,
    or is one of the few big Australian outlets on a plain .com. */
-const AU_HOSTS = ["miragenews.com"];
+const AU_HOSTS = ["miragenews.com", "torquecafe.com", "thedriven.io"];
 function isAu(url) {
   try {
     const host = new URL(url).hostname.toLowerCase();

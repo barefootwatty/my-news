@@ -36,7 +36,7 @@ for name, (n, note, empty) in EXPECT.items():
     if len(s["stories"]) != n: bad.append((name, "stories %d, expected %d" % (len(s["stories"]), n)))
     if (note is None) != (s["note"] is None) or (note and not s["note"].startswith(note)): bad.append((name, "note: %r" % s["note"]))
     if empty and not (s["empty"] or "").startswith(empty): bad.append((name, "empty text: %r" % s["empty"]))
-JUNK = ["gibbon", "darter", "South Carolina", "Melbourne tram", "Bensbach Road", "Sliema", "NT Daily", "drilling grant", "Japanese", "rock songs", "Kindness awards", "Cricketer"]
+JUNK = ["gibbon", "darter", "South Carolina", "Melbourne tram", "Bensbach Road", "Sliema", "NT Daily", "drilling grant", "Black Spot", "Heritage Grants", "Japanese", "rock songs", "Kindness awards", "Cricketer"]
 junk = [t for s in data["sections"] for t in s["stories"] if any(j in t for j in JUNK)]
 if junk: bad.append(("off-topic stories shown", junk))
 if len(data["kws"]) != 9 or data["theme"] != "day": bad.append(("migration", data["kws"], data["theme"]))
