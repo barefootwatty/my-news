@@ -184,7 +184,7 @@ against real ones. A Vercel preview of the code commit was built but never opene
 | Section | Rule (as stored) | Sent to Google | Sent to Bing |
 |---|---|---|---|
 | Yellowcheek | `yellowcheek / yellow cheek carp / Elopichthys, -darter` | `(yellowcheek OR "yellow cheek carp" OR Elopichthys) -darter` | `yellowcheek` |
-| NT business grants | `Northern Territory / NT / Territory / Territorian / Darwin, grant / funding / voucher / rebate, Australia [business]` | `("Northern Territory" OR NT OR Territory OR Territorian OR Darwin) (grant OR funding OR voucher OR rebate)` | `Northern Territory grant` |
+| NT business grants | `Northern Territory / NT / Territorian / Darwin, grant / voucher / rebate / funding round, business / industry / tourism / operator / trader, Australia` | place AND money word AND business word | `Northern Territory grant` |
 | Bensbach | `Bensbach, -Road, -Glenfield` | `Bensbach -Road -Glenfield` | `Bensbach` |
 | Lake Murray PNG | `Lake Murray, PNG / Papua New Guinea / Papua / Western Province / black bass` | `"Lake Murray" (PNG OR "Papua New Guinea" OR Papua OR "Western Province" OR "black bass")` | `Lake Murray PNG` |
 | Fly tying | `fly tying / fly tier / fly pattern [streamer / clouser / deceiver / baitfish]` | `("fly tying" OR "fly tier" OR "fly pattern")` | `fly tying` |
@@ -225,6 +225,17 @@ location.reload();
 ```
 
 ---
+
+## 7a. Real-feed check, 24 Nov 2026 (Claude Code, cloud)
+
+Branch run against real Google and Bing feeds. No JavaScript errors. Offline tests pass.
+- NT business grants was letting in road, hospital and Melbourne "Territory" funding
+  stories (5 of 6 wrong). Rule tightened: dropped bare "Territory" and bare "funding",
+  added a required business word. Now shows the one real business grant story of the year.
+- Pictures: the live `/api/preview` returned a picture for 4 of 8 sample stories.
+  Some publishers block it; that is the known fragile part.
+- AFANT shows 2 AFANT headlines plus NT croc stories that Google matched on the
+  article body (rare-term fallback). Likely AFANT is quoted in them; not verified.
 
 ## 8. Decisions already made
 
