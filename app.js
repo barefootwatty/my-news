@@ -2,36 +2,37 @@
 
 const STORE_KEY = "mynews.settings.v1";
 const PHOTO_KEY = "mynews.bgphoto.v1"; // stored separately: photos are big
-const DATA_VERSION = 4;
+const DATA_VERSION = 5;
 
 /* Each preset has a Google News query, and optionally `match`: words the story
    must mention (word-start match, so "fish" also catches "fishing").
    Google pads searches with loosely "related" stories — `match` weeds them out.
    `prefer` words float a story to the top of its section. */
 const PRESETS = [
-  { id: "nt",       label: "Top End & NT",    query: '"Northern Territory" OR "Top End" OR (Darwin Australia)',
+  { id: "nt",       label: "Top End & NT",    query: '"Northern Territory" OR "Top End" OR (Darwin Australia)', bing: "Northern Territory news",
     match: ["northern territory", "top end", "territor", "darwin", "kakadu", "katherine", "arnhem", "litchfield", "tiwi", "nhulunbuy", "palmerston", "daly river", "alice springs"] },
-  { id: "fishing",  label: "Fishing",         query: "fishing Australia",
+  { id: "fishing",  label: "Fishing",         query: "fishing Australia", bing: "fishing Australia",
     match: ["fish", "angl", "barra", "tackle", "lure", "reel", "crab", "prawn", "snapper", "jetty", "estuary"] },
   // saltwater fly news is scarce (often none for a week), so the section keeps
   // all real fly-fishing stories but `prefer` floats saltwater ones to the top
-  { id: "flyfish",  label: "Fly Fishing",     query: '"saltwater fly fishing" OR "fly fishing" OR flyfishing', days: 7,
+  { id: "flyfish",  label: "Fly Fishing",     query: '"saltwater fly fishing" OR "fly fishing" OR flyfishing', days: 7, bing: "fly fishing",
     match: ["fly fish"],
     prefer: ["saltwater", "salt water", "bonefish", "tarpon", "trevally", "queenfish", "barramundi", "permit", "milkfish", "flats", "estuary", "giant herring"] },
-  { id: "boating",  label: "Boating",         query: "boating Australia",
+  { id: "boating",  label: "Boating",         query: "boating Australia", bing: "boating Australia",
     match: ["boat", "marine", "yacht", "vessel", "sail", "ferry", "harbour", "tinnie", "skipper"] },
-  { id: "weather",  label: "Weather",         query: "weather Australia BOM",
+  { id: "weather",  label: "Weather",         query: "weather Australia BOM", bing: "Australia weather",
     match: ["weather", "forecast", "cyclone", "storm", "rain", "flood", "heat", "monsoon", "temperature", "wind", "wet season"] },
-  { id: "goodnews", label: "Good News",       query: '("good news" OR heartwarming OR uplifting OR "feel-good" OR kindness) Australia',
+  // au: only Australian publishers or stories that say Australia — the phrase "good news" is everywhere
+  { id: "goodnews", label: "Good News",       query: '("good news" OR heartwarming OR uplifting OR "feel-good" OR kindness) Australia', bing: "good news Australia", au: true,
     match: ["good news", "heartwarm", "uplift", "feel good", "kindness", "reunit", "rescue", "generous", "celebrat", "inspir", "miracle"],
     prefer: ["heartwarm", "uplift", "kindness", "reunit", "feel good"] },
-  { id: "afl",      label: "AFL Footy",       query: "AFL football" },
-  { id: "nrl",      label: "Rugby League",    query: "NRL rugby league" },
-  { id: "cricket",  label: "Cricket",         query: "cricket Australia" },
-  { id: "travel",   label: "Travel & Tourism",query: "travel tourism Australia",
+  { id: "afl",      label: "AFL Footy",       query: "AFL football", bing: "AFL" },
+  { id: "nrl",      label: "Rugby League",    query: "NRL rugby league", bing: "NRL" },
+  { id: "cricket",  label: "Cricket",         query: "cricket Australia", bing: "cricket Australia" },
+  { id: "travel",   label: "Travel & Tourism",query: "travel tourism Australia", bing: "Australia tourism",
     match: ["travel", "touris", "holiday", "flight", "airline", "cruise", "resort", "airport", "destination"] },
-  { id: "money",    label: "Money & Business",query: "business economy Australia" },
-  { id: "world",    label: "World News",      query: "world news" },
+  { id: "money",    label: "Money & Business",query: "business economy Australia", bing: "Australia economy" },
+  { id: "world",    label: "World News",      query: "world news", bing: "world news" },
 ];
 
 /* Looks. "auto" follows the device: Day in light mode, Night in dark mode. */
@@ -71,15 +72,33 @@ const DEFAULTS = {
   swipeTipSeen: false,
 };
 
-/* One-off re-tune (Nov 2026): these long keywords were searched as exact
-   phrases and never found a story. Swap them for versions that do. */
+/* One-off re-tunes (Nov 2026). Glenn's long keywords were searched as exact
+   phrases and never found a story; these swap them for versions that do. The
+   second block upgrades the first attempt after it was checked against the real
+   feeds. Keys are lower-case, single-spaced. */
+const TUNED = {
+  yellowcheek: "Yellowcheek: yellowcheek / yellow cheek carp / Elopichthys, -darter",
+  grants: "NT business grants: Northern Territory / NT / Territory / Territorian / Darwin, grant / funding / voucher / rebate, Australia [business]",
+  bensbach: "Bensbach, -Road, -Glenfield",
+  murray: "Lake Murray PNG: Lake Murray, PNG / Papua New Guinea / Papua / Western Province / black bass",
+  tying: "Fly tying: fly tying / fly tier / fly pattern [streamer / clouser / deceiver / baitfish]",
+  afant: "AFANT: AFANT / Amateur Fishermen's Association of the NT / Amateur Fishermen's Association of the Northern Territory",
+  f150: "F-150: F-150, Australia / Aussie [Australia]",
+};
 const RETUNE = {
-  "yellow cheek carp fishing": ["Yellowcheek: yellowcheek / yellow cheek carp / Elopichthys"],
-  "nt small business grant": ["NT business grants: Northern Territory / NT / Territory / Territorian, business, grant / funding / voucher"],
-  "bensbach river png": ["Bensbach"],
-  "lake murray png": ["Lake Murray PNG: Lake Murray, PNG / Papua New Guinea / Papua / Western Province / black bass"],
-  "streamer fly tying pattern": ["Streamer fly tying: fly tying / fly pattern / fly tier / tying, streamer / clouser / deceiver / baitfish"],
-  "afant f150 australia": ["AFANT: AFANT / Amateur Fishermen's Association", "F-150: F-150 / F-Series [Australia / Aussie]"],
+  "yellow cheek carp fishing": [TUNED.yellowcheek],
+  "nt small business grant": [TUNED.grants],
+  "bensbach river png": [TUNED.bensbach],
+  "lake murray png": [TUNED.murray],
+  "streamer fly tying pattern": [TUNED.tying],
+  "afant f150 australia": [TUNED.afant, TUNED.f150],
+  // first attempt (data version 4) -> current
+  "yellowcheek: yellowcheek / yellow cheek carp / elopichthys": [TUNED.yellowcheek],
+  "nt business grants: northern territory / nt / territory / territorian, business, grant / funding / voucher": [TUNED.grants],
+  "bensbach": [TUNED.bensbach],
+  "streamer fly tying: fly tying / fly pattern / fly tier / tying, streamer / clouser / deceiver / baitfish": [TUNED.tying],
+  "afant: afant / amateur fishermen's association": [TUNED.afant],
+  "f-150: f-150 / f-series [australia / aussie]": [TUNED.f150],
 };
 
 let settings = load();
@@ -106,7 +125,7 @@ function migrate(s) {
   if ((s.v || 0) < DATA_VERSION) {
     const out = [];
     for (const kw of s.customKeywords) {
-      const swap = RETUNE[String(kw).toLowerCase().replace(/\s+/g, " ").trim()];
+      const swap = RETUNE[String(kw).replace(/[’‘]/g, "'").toLowerCase().replace(/\s+/g, " ").trim()];
       for (const k of swap || [kw]) {
         if (!out.some((x) => x.toLowerCase() === k.toLowerCase())) out.push(k);
       }
@@ -355,12 +374,17 @@ function chosenVoice() {
      barramundi stocking             two plain words — both must appear
      yellowcheek / yellow cheek      "/" means either-or
      Lake Murray, PNG / Papua        "," means must-have-both (every part required)
-     F-150 [Australia]               [brackets] steer the search and float matching
-                                     stories up, but aren't required in the story
+     F-150 [Australia]               [brackets] float matching stories to the top,
+                                     but aren't required in the story
+     Bensbach, -Road                 a leading "-" leaves out stories with that word
      NT grants: NT, grant / funding  "Name: ..." gives the section a short name
 
    Plain keywords of 3+ words may miss one word (so "kakadu barra fishing news"
-   still finds things); anything written with commas is strict. */
+   still finds things); anything written with commas is strict.
+
+   "Australia" is special. A story counts as mentioning it when it says so OR
+   when its publisher's web address ends in .au — Australian outlets rarely put
+   "Australia" in a headline. It's sent to the search only from [brackets]. */
 
 const KW_STOP = new Set("the a an and for of in on to at with news latest".split(" "));
 const KW_CONTEXT = new Set(["australia", "australian", "aussie"]);
@@ -385,9 +409,9 @@ function parseKeyword(raw) {
   if (/[()]/.test(s)) {
     // hand-written Google search — pass it through, lightly sanity-check the results
     const words = sigWords(s);
-    out = { label: label || typed, query: s, groups: words.length ? [words] : [], need: words.length ? 1 : 0, prefer: [] };
+    out = { label: label || typed, query: s, bing: words.join(" "), groups: words.length ? [words] : [], need: words.length ? 1 : 0, prefer: [], not: [] };
   } else {
-    const prefer = [];
+    const prefer = [], not = [];
     s = s.replace(/\[([^\]]*)\]/g, (m, inner) => {
       for (const t of inner.split(/\s*[\/|,]\s*/)) if (t.trim()) prefer.push(t.trim());
       return " ";
@@ -396,17 +420,23 @@ function parseKeyword(raw) {
     let groups = [];
     const structured = /,|\s\/\s|\||\sOR\s|\s\+\s/.test(s);
     if (structured) {
-      groups = s.split(/\s*,\s*|\s+\+\s+/)
-        .map((part) => part.split(/\s+\/\s+|\s*\|\s*|\s+OR\s+/).map((t) => t.replace(/"/g, "").trim()).filter(Boolean))
-        .filter((g) => g.length);
+      for (const part of s.split(/\s*,\s*|\s+\+\s+/)) {
+        const p = part.replace(/"/g, "").trim();
+        if (/^-\s*\S/.test(p)) { not.push(p.replace(/^-\s*/, "")); continue; }
+        const alts = p.split(/\s+\/\s+|\s*\|\s*|\s+OR\s+/).map((t) => t.trim()).filter(Boolean);
+        if (alts.length) groups.push(alts);
+      }
     } else {
       const re = /"([^"]+)"|(\S+)/g;
       let m;
       while ((m = re.exec(s))) {
         if (m[1]) { if (m[1].trim()) groups.push([m[1].trim()]); continue; }
+        const minus = /^-[\p{L}\p{N}]/u.test(m[2]);
         const w = m[2].replace(/"/g, "").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
         const lw = w.toLowerCase();
-        if (!w || KW_STOP.has(lw)) continue;
+        if (!w) continue;
+        if (minus) { not.push(w); continue; }
+        if (KW_STOP.has(lw)) continue;
         if (KW_CONTEXT.has(lw)) { prefer.push(w); continue; }
         groups.push(KW_ALIAS[lw] ? KW_ALIAS[lw].slice() : [w]);
       }
@@ -414,12 +444,20 @@ function parseKeyword(raw) {
     if (!groups.length && prefer.length) groups = [prefer.splice(0)]; // only steering words typed, so they are the topic
     if (!groups.length) groups = [[s.replace(/"/g, "") || typed]];
     const n = groups.length;
+    const isCtx = (t) => KW_CONTEXT.has(t.toLowerCase());
     const q = (t) => (/[\s\-']/.test(t) ? '"' + t + '"' : t);
     const orJoin = (g) => (g.length > 1 ? "(" + g.map(q).join(" OR ") + ")" : q(g[0]));
-    const query = (groups.map(orJoin).join(" ") + (prefer.length ? " " + orJoin(prefer) : "")).slice(0, 280);
+    // "Australia" as a required part is judged on the story (see above), not sent as a search word
+    let asked = groups.filter((g) => !g.every(isCtx));
+    if (!asked.length) asked = groups;
+    const steer = prefer.filter(isCtx);
+    const query = (asked.map(orJoin).join(" ") + (steer.length ? " " + orJoin(steer) : "") +
+      not.map((t) => " -" + q(t)).join("")).slice(0, 280);
+    // Bing's feed returns nothing for OR / brackets / quotes, so it gets plain words: the first of each part
+    const bing = asked.map((g) => g[0]).concat(steer.slice(0, 1)).join(" ").slice(0, 120);
     out = {
-      label: label || (structured ? groups[0][0] : s.replace(/"/g, "") || typed),
-      query, groups, prefer,
+      label: label || (structured ? groups[0][0] : s.replace(/(^|\s)-\S+/g, " ").replace(/"/g, "").replace(/\s+/g, " ").trim() || typed),
+      query, bing, groups, prefer, not,
       need: structured || n <= 2 ? n : n - 1,
     };
   }
@@ -470,16 +508,19 @@ function activeSections() {
   for (const p of PRESETS) {
     if (!settings.presetIds.includes(p.id)) continue;
     const days = p.days || 2;
+    const groups = p.match ? [p.match] : [];
+    if (p.au) groups.push(["Australia", "Aussie"]);
     sections.push({
-      kind: "preset", label: p.label, query: p.query,
-      groups: p.match ? [p.match] : [], need: p.match ? 1 : 0, prefer: p.prefer || [],
+      kind: "preset", label: p.label, query: p.query, bing: p.bing || p.label,
+      groups, need: groups.length, prefer: p.prefer || [], not: [],
       ladder: days < 7 ? [days, 7] : [days],
     });
   }
   for (const kw of settings.customKeywords) {
     const k = parseKeyword(kw);
     // niche keywords widen their window (week → month → year) until they find something
-    sections.push({ kind: "custom", label: k.label, query: k.query, groups: k.groups, need: k.need, prefer: k.prefer, ladder: [7, 30, 0] });
+    sections.push({ kind: "custom", label: k.label, query: k.query, bing: k.bing, groups: k.groups, need: k.need,
+      prefer: k.prefer, not: k.not, ladder: [7, 30, 365] });
   }
   return sections;
 }
@@ -632,28 +673,48 @@ async function runSection(block, section, ctx) {
 }
 
 const MIN_STORIES = 3; // fewer than this and the section looks further afield
+const RARE_POOL = 25;  // a search that finds this few stories in total is a rare term: trust the search engine's own match
 
 /* Fetch a section, widening the time window (and adding the backup source)
    until there's something worth showing. Throws only when no source answered. */
 async function loadSection(section, ctx) {
-  let google = null, googleDown = false, bing = null, bingTried = false;
+  const pool = new Map(); // every Google story seen so far, across the windows tried
+  let googleOk = false, googleDown = false, bing = null, bingTried = false;
   let kept = [], days = section.ladder[0];
+  const everything = () => [...pool.values()].concat(bing || []).sort((a, b) => (b.date || 0) - (a.date || 0));
   for (const d of section.ladder) {
     days = d;
     if (!googleDown) {
-      try { google = await fetchFeed("g", section.query, d); }
-      catch (e) { googleDown = true; google = null; }
+      // the year-long look also asks with no date limit: each turns up stories the other misses
+      const asks = d >= 365 ? [d, 0] : [d];
+      const got = await Promise.allSettled(asks.map((x) => fetchFeed("g", section.query, x)));
+      const ok = got.filter((g) => g.status === "fulfilled");
+      if (ok.length) {
+        googleOk = true;
+        for (const g of ok) for (const it of g.value) {
+          const k = keyOf(it.title).slice(0, 60);
+          if (k && !pool.has(k)) pool.set(k, it);
+        }
+      } else if (!googleOk) googleDown = true;
     }
-    kept = pick(google || [], section, d, ctx);
-    const thin = kept.length < MIN_STORIES;
-    if ((googleDown || (thin && section.kind === "custom")) && !bingTried) {
+    kept = pick(everything(), section, d, ctx);
+    if ((googleDown || (kept.length < MIN_STORIES && section.kind === "custom")) && !bingTried) {
       bingTried = true;
-      try { bing = await fetchFeed("b", section.query, 0); } catch (e) { bing = null; }
+      try { bing = await fetchFeed("b", section.bing, 0); } catch (e) { bing = null; }
+      kept = pick(everything(), section, d, ctx);
     }
-    if (bing && (googleDown || thin)) kept = pick((google || []).concat(bing), section, d, ctx);
     if (kept.length >= MIN_STORIES) break;
   }
   if (googleDown && !bing) throw new Error("no source answered");
+
+  // A rare single term (few results in total) with still not enough to show: Google found the word in
+  // the article even though the headline doesn't say it. Take those too, newest first.
+  if (section.kind === "custom" && section.groups.length <= 1 && kept.length < MIN_STORIES && pool.size && pool.size <= RARE_POOL) {
+    const have = new Set(kept.map((it) => it.dkey));
+    const loose = pick([...pool.values()].sort((a, b) => (b.date || 0) - (a.date || 0)), { ...section, groups: [], need: 0 }, 365, ctx);
+    kept = kept.concat(loose.filter((it) => !have.has(it.dkey)).slice(0, 5 - kept.length));
+    days = 365;
+  }
   return { kept, days };
 }
 
@@ -670,7 +731,10 @@ async function fetchFeed(source, query, days) {
     const items = source === "b" ? parseBing(xml) : parseGoogle(xml);
     for (const it of items) {
       if (it.date && isNaN(it.date)) it.date = null;
-      it.hay = (it.title + " | " + it.src + " | " + it.desc).replace(/[’‘]/g, "'");
+      // an Australian publisher counts as "mentions Australia" (see the keyword notes)
+      const body = (it.title + " | " + it.desc + (it.au ? " | Australia" : "")).replace(/[’‘]/g, "'");
+      it.hay = body;                          // what a keyword is tested against
+      it.hayWide = body + " | " + it.src;     // presets also count the publisher's name ("Fishing World")
     }
     items.sort((a, b) => (b.date || 0) - (a.date || 0));
     return items;
@@ -683,6 +747,16 @@ function stripTags(html) {
   return html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/* Is this an Australian publisher? Web address ends in .au, or has "australia" in it,
+   or is one of the few big Australian outlets on a plain .com. */
+const AU_HOSTS = ["miragenews.com"];
+function isAu(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return /\.au$/.test(host) || host.includes("australia") || AU_HOSTS.some((h) => host === h || host.endsWith("." + h));
+  } catch (e) { return false; }
+}
+
 function parseGoogle(xml) {
   const doc = new DOMParser().parseFromString(xml, "text/xml");
   if (doc.querySelector("parsererror") || !doc.querySelector("rss")) throw new Error("bad feed");
@@ -691,11 +765,14 @@ function parseGoogle(xml) {
     let title = text(item, "title");
     const link = text(item, "link");
     const src = text(item, "source");
+    const srcEl = item.querySelector("source");
     const pub = text(item, "pubDate");
     // Google News titles end with " - Source"; trim it since we show source separately
     if (src && title.endsWith(" - " + src)) title = title.slice(0, -(src.length + 3));
     if (title && /^https?:\/\//i.test(link)) {
-      items.push({ title, link, src, date: pub ? new Date(pub) : null, desc: stripTags(text(item, "description")), from: "g" });
+      // the description repeats the publisher's name in a <font> tag — drop it so it isn't matched as story text
+      const desc = stripTags(text(item, "description").replace(/<font\b[^>]*>[\s\S]*?<\/font>/gi, " "));
+      items.push({ title, link, src, date: pub ? new Date(pub) : null, desc, au: isAu(srcEl && srcEl.getAttribute("url")), from: "g" });
     }
   }
   return items;
@@ -735,7 +812,7 @@ function parseBing(xml) {
     items.push({
       title, link, src: stripTags(tag("News:Source")), date: pub ? new Date(pub) : null,
       desc: stripTags(decodeEntities(tag("description"))),
-      image: /^https:\/\//i.test(image) ? image : null, from: "b",
+      image: /^https:\/\//i.test(image) ? image : null, au: isAu(link), from: "b",
     });
   }
   return items;
@@ -757,12 +834,14 @@ function pick(items, section, days, ctx) {
     const lowTitle = it.title.toLowerCase();
     if (muted.some((w) => lowTitle.includes(w))) continue;
     // the story must actually mention the topic — search engines pad with "related" stories
-    const hits = groupsHit(it.hay, section.groups);
+    const hay = section.kind === "preset" ? it.hayWide : it.hay;
+    if (section.not.length && anyTerm(hay, section.not)) continue;
+    const hits = groupsHit(hay, section.groups);
     if (hits < section.need) continue;
     const brake = hitCount(it.title, settings.brakes);
     if (brake >= 2) continue; // clearly the kind of story they said "less of"
     seen.add(dkey);
-    const preferred = section.prefer.length && anyTerm(it.hay, section.prefer) ? 3 : 0;
+    const preferred = section.prefer.length && anyTerm(hay, section.prefer) ? 3 : 0;
     const complete = section.groups.length > 1 && hits === section.groups.length ? 2 : 0;
     kept.push({ ...it, key, dkey, score: preferred + complete + hitCount(it.title, settings.boosts) - brake });
     if (kept.length >= 24) break;
@@ -774,7 +853,7 @@ function pick(items, section, days, ctx) {
 function renderSection(block, section, result, ctx) {
   // a story already shown in an earlier section isn't repeated
   const fresh = result.kept.filter((it) => !ctx.seenGlobal.has(it.dkey));
-  const show = fresh.slice(0, result.days === 0 ? 5 : 8);
+  const show = fresh.slice(0, result.days >= 365 ? 5 : 8);
   for (const it of show) ctx.seenGlobal.add(it.dkey);
   latestBySection[section.label] = show;
 
