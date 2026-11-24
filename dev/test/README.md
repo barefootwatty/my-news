@@ -9,9 +9,9 @@ app's own logic, not that Google or Bing still answer the way the fixtures assum
 
 ## Where it goes
 
-Put this folder at `dev/test/` in the repo (`server.js` finds the repo two levels
-up; set `MYNEWS_ROOT` to point elsewhere). If you commit it, add `dev/` to
-`.vercelignore` so it is not served on the live site.
+This folder lives at `dev/test/` in the repo. `server.js` finds the repo two
+levels up (set `MYNEWS_ROOT` to point elsewhere). `dev/` is in `.vercelignore`,
+so none of this is served on the live site.
 
 ## Run
 
@@ -25,14 +25,23 @@ Screenshots and `report.json` land in `out/`.
 
 ## What the fixtures do (see google() and bing() in server.js)
 
-| Query contains | Behaviour it exercises |
+The stories are invented, but each junk case copies a kind of junk the real
+feeds returned on 24 Nov 2026.
+
+| Section | Behaviour it exercises |
 |---|---|
-| `Top End`, `fishing Australia` | normal presets, with off-topic stories that must be filtered out |
-| `yellowcheek` | nothing for 7 or 30 days; old stories in the year look-back; one Bing story matched on its description only |
-| `voucher` (NT grants) | 2 on-topic Google stories, so Bing is asked and adds a third |
-| `Bensbach` | 1 story at 30 days, 3 in the year look-back |
-| `Lake Murray` | South Carolina stories that must be dropped; 2 PNG stories kept |
-| `streamer` | nothing anywhere: the "No stories" message |
-| `AFANT` | Google returns 503: Bing alone carries the section |
-| `F-150` | steering words float Australian stories to the top |
-| `downtest` | both sources fail: the "Couldn't reach the news sources" message |
+| Top End, Fishing | normal presets, with off-topic stories that must be filtered out |
+| Good News | Australian-only preset: overseas "feel-good" stories dropped |
+| Yellowcheek | nothing recent; a namesake fish removed by `-darter`; one Bing story matched on its description |
+| NT business grants | needs a place, a money word and an Australian publisher; Bing adds a third story at 30 days |
+| Bensbach | house listings removed by `-Road`; the only story is a rare-term fallback |
+| Lake Murray PNG | South Carolina stories dropped; 2 PNG stories kept |
+| Fly tying | all fly tying stories count; the streamer one leads |
+| AFANT | one headline match plus two rare-term fallbacks; a Maltese association dropped |
+| F-150 | Japan-market story dropped; Australian publishers kept |
+| googledown | Google fails: Bing alone carries the section |
+| downtest | both sources fail: the "Couldn't reach the news sources" message |
+
+Bing's fixture returns nothing for any query containing OR, brackets or quotes,
+as the real feed does. A section that relies on Bing only passes if the app
+sends plain words.

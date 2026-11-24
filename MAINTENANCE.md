@@ -55,17 +55,27 @@ this topic".
 Now, per section (`loadSection` in `app.js`):
 
 1. Ask Google News for the section's first window (presets 2 days, keywords 7).
-2. Keep only stories that are on-topic (`pick`): the headline, source name or
-   feed description must mention enough of the keyword's groups.
+2. Keep only stories that are on-topic (`pick`). For a keyword, the headline or
+   feed description must mention enough of its parts. Presets also count the
+   publisher's name.
 3. Fewer than 3 kept? A keyword also asks Bing News (once) and merges it in.
-   Bing's feed carries the real article link, a summary and a picture, so
-   those stories skip `api/preview.js` entirely.
+   Bing gets plain words only — it returns nothing for OR, brackets or quotes.
+   Its feed carries the real article link, a summary and sometimes a picture,
+   so those stories skip `api/preview.js` entirely.
 4. Still fewer than 3? Widen and repeat — presets 2 → 7 days; keywords
-   7 → 30 days → no limit (capped at a year, 5 stories). A gold note on the
-   section says when it had to look back further.
-5. Google failed outright? Bing alone carries the section. Both failed? The
+   7 → 30 → 365 days. The 365-day step asks Google twice (`when:365d` and no
+   limit) because each finds stories the other misses. Everything Google has
+   returned so far is pooled. A gold note on the section says when it had to
+   look back further.
+5. A one-part keyword that is still short, where Google found 25 or fewer
+   stories in total, is a rare term: stories from the past year are shown even
+   if the headline doesn't contain the word (Google matched the article body).
+6. Google failed outright? Bing alone carries the section. Both failed? The
    section shows a "Couldn't reach the news sources" message with a Try again
    button — never a false "nothing here".
+
+Checked against the real feeds on 24 Nov 2026: both sources answer Vercel, and
+`when:30d` / `when:365d` are honoured. See `HANDOVER.md` for what was found.
 
 ### Keyword syntax (`parseKeyword`)
 
@@ -77,7 +87,9 @@ Stored as plain strings in `settings.customKeywords`, so old keywords keep worki
 | `barramundi stocking` | plain words: both must appear (3+ plain words may miss one) |
 | `yellowcheek / yellow cheek` | slash (with spaces) = either-or |
 | `Lake Murray, PNG / Papua` | comma = must-have-both, every part required |
-| `F-150 [Australia / Aussie]` | brackets steer the search and float matches up, but aren't required |
+| `fly tying [streamer]` | brackets float matching stories to the top, but aren't required |
+| `Bensbach, -Road` | a leading minus leaves out stories with that word |
+| `F-150, Australia` | Australian stories only (see below) |
 | `NT grants: NT, grant / funding` | `Name: ` prefix = short section name |
 | anything with `( )` | passed to Google untouched (legacy) |
 
@@ -86,10 +98,15 @@ endings (`grant` → grants); spaces and hyphens are interchangeable (`F-150` �
 F150, `fly fish` → flyfishing); short words, numbers and CAPS acronyms of 2–3
 letters must match exactly (`NT` never hits "ant" or "nt" inside a word).
 In plain keywords `nt`, `png`, `qld` etc. expand to their full names, and
-"Australia" becomes a steering word rather than a required one.
+"Australia" becomes a bracket word rather than a required one.
 
-`RETUNE` in `app.js` is a one-off map that swapped Glenn's six dead keywords for
-tuned versions on first load of v4. Tune a keyword for him by sending a setup
+"Australia" is special. A story counts as mentioning it when it says so, or
+when its publisher is Australian: site ending `.au`, "australia" in the site
+name, or listed in `AU_HOSTS`. It is sent to Google as a search word only from
+square brackets.
+
+`RETUNE` in `app.js` is a one-off map that swaps Glenn's six dead keywords (and
+the first attempt at tuning them) for the versions in `TUNED`. Tune a keyword for him by sending a setup
 link (below) or having him retype it.
 
 ### Setup link
