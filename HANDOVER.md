@@ -12,7 +12,8 @@ reference for how the app works. This file is the state of play and your job lis
 
 - **What it is:** Glenn's personal news reader. A static page plus two tiny
   Vercel functions. No build step, no framework, no dependencies, no database.
-- **Live:** https://my-news-au.vercel.app, running commit `f92ded1` on `main`.
+- **Live:** https://my-news-au.vercel.app, running `main`. As of 25 Nov 2026 that includes
+  everything on `tune-real-feeds` plus the Mac fixes in section 7b. Sections 1 and 2 below are history.
 - **Repo:** https://github.com/barefootwatty/my-news (public). Push to `main`
   deploys to production in about 45 seconds.
 - **This branch, `tune-real-feeds`, is not live.** It holds fixes written after
@@ -186,7 +187,7 @@ against real ones. A Vercel preview of the code commit was built but never opene
 | Section | Rule (as stored) | Sent to Google | Sent to Bing |
 |---|---|---|---|
 | Yellowcheek | `yellowcheek / yellow cheek carp / Elopichthys, -darter` | `(yellowcheek OR "yellow cheek carp" OR Elopichthys)` | `yellowcheek` |
-| NT business grants | `Northern Territory / NT / Territory / Territorian / Darwin / Alice Springs / Katherine / Top End, grant / funding / voucher / rebate, business / tourism / operator / fishing, Australia, -Morning Mail` | the three bracketed OR groups (place, money, business) | `Northern Territory grant business` |
+| NT business grants | `Northern Territory / NT / Territorian / Darwin, grant / voucher / rebate / funding round, business / industry / tourism / operator / trader, Australia` | place AND money word AND business word | `Northern Territory grant business` |
 | Bensbach | `Bensbach, -Road, -Glenfield` | `Bensbach` | `Bensbach` |
 | Lake Murray PNG | `Lake Murray, PNG / Papua New Guinea / Papua / Western Province / black bass` | `"Lake Murray" (PNG OR "Papua New Guinea" OR Papua OR "Western Province" OR "black bass")` | `Lake Murray PNG` |
 | Fly tying | `fly tying / fly tier / fly pattern [streamer / clouser / deceiver / baitfish]` | `("fly tying" OR "fly tier" OR "fly pattern")` | `fly tying` |
@@ -228,7 +229,18 @@ location.reload();
 
 ---
 
-## 7a. Real-feed run, 24 Nov 2026 (Claude Code, Glenn's Mac)
+## 7a. Real-feed check, 24 Nov 2026 (Claude Code, cloud)
+
+Branch run against real Google and Bing feeds. No JavaScript errors. Offline tests pass.
+- NT business grants was letting in road, hospital and Melbourne "Territory" funding
+  stories (5 of 6 wrong). Rule tightened: dropped bare "Territory" and bare "funding",
+  added a required business word. Now shows the one real business grant story of the year.
+- Pictures: the live `/api/preview` returned a picture for 4 of 8 sample stories.
+  Some publishers block it; that is the known fragile part.
+- AFANT shows 2 AFANT headlines plus NT croc stories that Google matched on the
+  article body (rare-term fallback). Likely AFANT is quoted in them; not verified.
+
+## 7b. Real-feed run, 24 Nov 2026 (Claude Code, Glenn's Mac)
 
 Run with `dev_server.py` and the section 7 snippet. Offline tests pass before and after.
 
@@ -236,8 +248,7 @@ Run with `dev_server.py` and the section 7 snippet. Offline tests pass before an
 - **Good News:** Australian-only works. A few weak ones remain (a cricket story, "good news" used loosely).
 - **Yellowcheek:** empty, which is true.
 - **Bensbach:** was empty. Now shows the one body-mention story (11 months old; it drops off in mid-December).
-- **NT business grants:** was heritage grants, road funding and hospital funding. A business word is now
-  required. Shows 2 stories from the past year. Real NT business-grant headlines are that rare.
+- **NT business grants:** the cloud session's rule (7a) is the one kept. It was already live, so no settings upgrade was needed.
 - **AFANT:** 2 real AFANT stories plus 3 fallback stories, all the same NT croc-versus-fisherman story.
 - **Pictures and summaries:** working. 35 of 52 stories had a picture, 49 of 52 linked straight to the
   article. NT News and The Australian block the preview fetch, so their stories show headline only.
@@ -245,6 +256,8 @@ Run with `dev_server.py` and the section 7 snippet. Offline tests pass before an
 - No Node on the Mac: the offline test server was run with the Node bundled inside the Python
   `playwright` package (`…/site-packages/playwright/driver/node`), in a throwaway venv, with `CHROME` set
   to the installed Google Chrome.
+- **Heads-up:** the cloud session merged this branch to `main` and pushed it live (`e6f77b6`) the same
+  evening. The Mac work was merged on top of that and shipped as version 6 of the app files.
 
 ## 8. Decisions already made
 

@@ -3,9 +3,9 @@
 // update goes live for everyone as soon as it's pushed. The cached copy is only
 // a fallback for a slow or missing connection. Fonts and icons never change, so
 // they're served straight from the cache. News is always fetched live.
-const SHELL = "mynews-shell-v5";
+const SHELL = "mynews-shell-v6";
 const FILES = [
-  "./", "index.html", "style.css?v=5", "app.js?v=5", "manifest.webmanifest", "icon-192.png",
+  "./", "index.html", "style.css?v=5", "app.js?v=6", "manifest.webmanifest", "icon-192.png",
   "fonts/mulish-latin-700-normal.woff2", "fonts/mulish-latin-800-normal.woff2", "fonts/mulish-latin-900-normal.woff2",
   "fonts/barlow-latin-400-normal.woff2", "fonts/barlow-latin-500-normal.woff2", "fonts/barlow-latin-600-normal.woff2",
   "fonts/caudex-latin-400-normal.woff2", "fonts/caudex-latin-400-italic.woff2",

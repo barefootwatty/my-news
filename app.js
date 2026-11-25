@@ -78,7 +78,7 @@ const DEFAULTS = {
    feeds. Keys are lower-case, single-spaced. */
 const TUNED = {
   yellowcheek: "Yellowcheek: yellowcheek / yellow cheek carp / Elopichthys, -darter",
-  grants: "NT business grants: Northern Territory / NT / Territory / Territorian / Darwin / Alice Springs / Katherine / Top End, grant / funding / voucher / rebate, business / tourism / operator / fishing, Australia, -Morning Mail",
+  grants: "NT business grants: Northern Territory / NT / Territorian / Darwin, grant / voucher / rebate / funding round, business / industry / tourism / operator / trader, Australia",
   bensbach: "Bensbach, -Road, -Glenfield",
   murray: "Lake Murray PNG: Lake Murray, PNG / Papua New Guinea / Papua / Western Province / black bass",
   tying: "Fly tying: fly tying / fly tier / fly pattern [streamer / clouser / deceiver / baitfish]",
@@ -88,6 +88,7 @@ const TUNED = {
 const RETUNE = {
   "yellow cheek carp fishing": [TUNED.yellowcheek],
   "nt small business grant": [TUNED.grants],
+  "nt business grants: northern territory / nt / territory / territorian / darwin, grant / funding / voucher / rebate, australia [business]": [TUNED.grants],
   "bensbach river png": [TUNED.bensbach],
   "lake murray png": [TUNED.murray],
   "streamer fly tying pattern": [TUNED.tying],
