@@ -1,9 +1,9 @@
 # Local testing only — NOT part of the deployed app.
 # Serves the app files and stands in for the Vercel /api functions.
-import http.server, urllib.request, urllib.parse, os, re, json, html as htmlmod
+import http.server, urllib.request, urllib.parse, os, re, sys, json, html as htmlmod
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-PORT = 8765
+PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765  # python3 dev_server.py 8792 when 8765 is taken
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
 

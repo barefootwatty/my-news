@@ -37,7 +37,7 @@ These were made to Glenn and, in writing, to the friends he shared the app with:
 | Feed fetch | `api/feed.js` | Vercel function. Proxies a news RSS feed: `?q=` query, `&d=` days (1–365, 0 = no limit), `&s=b` for the Bing News backup (default Google News AU). 7 s timeout. Good answers CDN-cached 10 min; failures return 502 and are never cached. |
 | Card enrichment | `api/preview.js` | THE FRAGILE ONE — see below. |
 | PWA | `manifest.webmanifest`, `sw.js`, `icon-*.png` | Add-to-home-screen. The service worker is network-first, so a push reaches everyone on their next open. |
-| Local dev | `dev_server.py` | `python3 dev_server.py` → localhost:8765. Mirrors both API functions in Python. NOT deployed (see `.vercelignore`). |
+| Local dev | `dev_server.py` | `python3 dev_server.py` → localhost:8765 (`python3 dev_server.py 8792` when another project has 8765). Mirrors both API functions in Python. NOT deployed (see `.vercelignore`). |
 
 User settings key: `mynews.settings.v1` (JSON), background photo:
 `mynews.bgphoto.v1` (JPEG data-URL) — both localStorage. `settings.v` is the
@@ -67,6 +67,8 @@ Now, per section (`loadSection` in `app.js`):
    limit) because each finds stories the other misses. Everything Google has
    returned so far is pooled. A gold note on the section says when it had to
    look back further.
+   A keyword that names PNG, plus something else, also asks Google once for
+   each PNG outlet by name, alongside the first search (see "PNG outlets" below).
 5. A one-part keyword that is still short, where Google found 25 or fewer
    stories in total, is a rare term: stories from the past year are shown even
    if the headline doesn't contain the word (Google matched the article body).
@@ -109,6 +111,28 @@ PNG works the same way (27 Nov 2026). A publisher whose site ends in `.pg` (The
 National, Post-Courier, NBC PNG, EMTV), or is listed in `PG_HOSTS` (PNG outlets
 on a plain `.com`), counts as mentioning "PNG" and "Papua New Guinea". PNG
 papers write "Lake Murray communities struggle to find water", never "PNG".
+
+### PNG outlets, asked for by name (27 Nov 2026)
+
+PNG's own outlets are thin in a normal Google News search. NBC PNG's "Lake
+Murray dries up as severe drought hits PNG's Western Province" is in Google's
+index but never came back for the Lake Murray search. It does come back for
+`"Lake Murray" site:nbc.com.pg`. An OR of several sites drops it again, so it
+is one site per ask.
+
+- `PG_SITES` in `app.js` lists the outlets: NBC PNG, Post-Courier, The National.
+- `parseKeyword` builds `sites`: the keyword's search without its PNG part, plus
+  ` site:<outlet>`. Only for keywords that name PNG or Papua New Guinea (as a
+  must-have, an either-or, or in brackets) and have something else to search for.
+  `Bensbach, -Road` gets none; `Bensbach [PNG]` would.
+- `loadSection` sends them once, over the past year, alongside the first search,
+  through the same `api/feed.js`. No new source and no new function code. A
+  failed ask is ignored. The results are pooled and go through `pick()` like
+  any other story; a `.pg` publisher counts as mentioning PNG.
+- `isIndexPage()` drops the site's own listing pages that these asks return
+  ("… Archives", "My Blog Page | … | Page 882", the home page).
+- Cost: three more feed requests each time a PNG topic loads.
+- Loop PNG is not listed: `looppng.com` no longer resolves.
 
 `RETUNE` in `app.js` is a one-off map that swaps Glenn's six dead keywords (and
 the first attempt at tuning them) for the versions in `TUNED`. Tune a keyword for him by sending a setup
@@ -190,7 +214,7 @@ redirect page). This is the same approach as the open-source
   (`previewWatch`), 4 at a time (`queuePreview`).
 - Junk summary filter: `cleanSummary()` in `app.js`.
 - Shipping UI changes: bump `?v=N` on style.css/app.js in index.html AND the
-  matching entries + cache name in `sw.js`. (Both are `v=7` as of 27 Nov 2026.) If you add a file to the `FILES`
+  matching entries + cache name in `sw.js`. (`style.css?v=7`, `app.js?v=8` as of 27 Nov 2026.) If you add a file to the `FILES`
   list in `sw.js`, make sure it exists — one 404 there and the new service
   worker never installs.
 

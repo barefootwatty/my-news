@@ -2,11 +2,12 @@
 // (api/feed.js, api/preview.js) with every upstream fetch replaced by fixtures,
 // so it works with no internet. The fixtures imitate Google News and Bing News
 // RSS as best understood in Nov 2026 — they are NOT recordings of real feeds.
-//   node server.js        -> http://127.0.0.1:8765
+//   node server.js        -> http://127.0.0.1:8765   (PORT=8791 node server.js to use another port)
 // Fixture behaviour by query: see google() and bing() below.
 const http = require("http"), fs = require("fs"), path = require("path");
 const ROOT = process.env.MYNEWS_ROOT || path.resolve(__dirname, "../..");
 const feed = require(ROOT + "/api/feed.js"), preview = require(ROOT + "/api/preview.js");
+const PORT = +process.env.PORT || 8765;
 const now = Date.now();
 const ago = (d) => new Date(now - d * 864e5).toUTCString();
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -21,6 +22,14 @@ const bRss = (items) => `<?xml version="1.0" encoding="utf-8" ?><rss version="2.
 // The stories below are invented, but each junk case copies a kind of junk the real feeds returned.
 function google(q, days) {
   const w = (list) => list.filter((x) => days === 0 || x[2] <= days).map((x) => g(...x));
+  // A PNG topic also asks each PNG outlet by name ("Lake Murray" site:nbc.com.pg). Only that ask returns NBC PNG's
+  // story. The asks also return the site's own listing pages, which must not show, and one of them fails outright.
+  if (/ site:/.test(q)) {
+    if (!/^"Lake Murray" site:/.test(q)) return gRss([]);
+    if (/site:nbc\.com\.pg$/.test(q)) return gRss(w([["Lake Murray dries up as severe drought hits PNG's Western Province", "NBC PNG News", 3, "www.nbc.com.pg"], ["NBC PNG News", "NBC PNG News", 1, "www.nbc.com.pg"], ["Rugby takes centre stage in Nomad as Maso cup kicks off", "NBC PNG News", 2, "www.nbc.com.pg"]]));
+    if (/site:postcourier\.com\.pg$/.test(q)) return gRss(w([["Lake Murray communities Archives", "Post Courier", 2, "www.postcourier.com.pg"], ["Lake Murray Lodge reopens after flood repairs in Western Province", "Post Courier", 4, "www.postcourier.com.pg"], ["My Blog Page | Lake Murray | Page 882", "Post Courier", 5, "www.postcourier.com.pg"]]));
+    return null; // The National's ask fails: the section must carry on without it
+  }
   if (/Top End/.test(q) && !/rebate/.test(q)) return gRss(w([["Darwin Harbour ferry terminal upgrade gets green light", "NT News", 0.1, "www.ntnews.com.au"], ["Top End build-up storms arrive early as Bureau flags active monsoon", "ABC News", 0.3, "www.abc.net.au"], ["Territory tourism operators report record dry season bookings", "Katherine Times", 0.6, "www.katherinetimes.com.au"], ["Kakadu rangers reopen Jim Jim Falls road ahead of schedule", "NT News", 0.9, "www.ntnews.com.au"], ["Charles Darwin letters fetch record price at London auction", "The Guardian", 0.4, "www.theguardian.com"], ["Melbourne tram strike enters second day", "The Age", 0.2, "www.theage.com.au"], ["Palmerston boat ramp to get floating pontoon", "Mirage News", 1.4, "www.miragenews.com"], ["Arnhem Land rangers trial drone croc surveys", "SBS News", 1.7, "www.sbs.com.au"]]));
   if (/^fishing Australia/.test(q)) return gRss(w([["Barra season off to a flyer as run-off rivers fire", "Fishing World", 0.2, "www.fishingworld.com.au"], ["New bag limits for snapper flagged in fisheries review", "ABC News", 0.5, "www.abc.net.au"], ["Tackle shop marks 50 years on the same corner", "NT News", 1.2, "www.ntnews.com.au"], ["Minister announces budget review", "The Australian", 0.3, "www.theaustralian.com.au"]]));
   // Good News is Australian-only: overseas "feel-good" stories must go
@@ -82,4 +91,4 @@ http.createServer((req, res) => {
   if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end("nf"); }
   res.writeHead(200, { "content-type": TYPES[path.extname(f)] || "application/octet-stream", "cache-control": "no-store" });
   fs.createReadStream(f).pipe(res);
-}).listen(8765, "127.0.0.1", () => console.log("test server on 8765"));
+}).listen(PORT, "127.0.0.1", () => console.log("test server on " + PORT));

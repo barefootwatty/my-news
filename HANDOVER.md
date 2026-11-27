@@ -272,11 +272,13 @@ Found by Glenn on the live app. Tested on the real feeds and offline (`run.py`, 
   went from 2 stories to 6 in the past year (5 shown: the year-long look-back caps at 5).
 - **"Wrong topic" button** in the story menu (swipe right or ⋯). Blocks that publisher for that
   topic only. Listed, with undo, in settings. See `MAINTENANCE.md`.
-- App files are `v=7`.
+- App files are `v=7`. Live as `9b337e1`, checked on the live site.
 
-### PNG outlets: what was found (not built)
+### PNG outlets: what was found
 
-Checked from Glenn's Mac on 27 Nov 2026. Nothing here is built yet.
+Checked from Glenn's Mac on 27 Nov 2026. The "cheapest build" at the end of this list was then built
+the same day (`app.js?v=8`): see "PNG outlets, asked for by name" in `MAINTENANCE.md`. On the real
+feeds it added the NBC PNG drought story to Lake Murray PNG. The papers' own feeds are not used.
 
 - **Google already has NBC PNG.** `"Lake Murray" site:nbc.com.pg` returns "Lake Murray dries up as
   severe drought hits PNG's Western Province" (7 Aug 2026). The normal search never returns it, and
@@ -368,3 +370,7 @@ Don't re-open these unless Glenn does.
   before touching it.
 - A cloud session may not be able to reach `vercel.app`, Google or Bing from
   its shell. A session on Glenn's Mac can.
+- Port 8765 may be taken by another of Glenn's projects. `python3 dev_server.py 8792` and
+  `PORT=8791` for the offline tests (`dev/test/README.md`) use other ports. Don't stop the other server.
+- The offline swipe tests must centre a story on screen before dragging it (`centre()` in
+  `dev/test/run_common.py`): at the top of the screen the sticky top bar takes the drag.

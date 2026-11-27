@@ -1,5 +1,6 @@
 import json, os
-URL = "http://127.0.0.1:8765/"
+PORT = os.environ.get("PORT", "8765")  # set PORT for both server.js and these scripts when 8765 is taken
+URL = "http://127.0.0.1:%s/" % PORT
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
 os.makedirs(OUT, exist_ok=True)
@@ -39,6 +40,12 @@ def scroll_all(pg):
     for y in range(0, 12000, 500):
         pg.evaluate("y => window.scrollTo(0, y)", y); pg.wait_for_timeout(100)
     pg.wait_for_timeout(1000)
+
+def centre(pg, loc):
+    """Put a story in the middle of the screen and return its box. A drag has to start on the story itself:
+    off screen it hits nothing, and at the very top of the screen it hits the sticky top bar instead."""
+    loc.evaluate("e => e.scrollIntoView({ block: 'center' })"); pg.wait_for_timeout(150)
+    return loc.bounding_box()
 
 def shot(name):
     return os.path.join(OUT, name)

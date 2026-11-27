@@ -395,7 +395,13 @@ function chosenVoice() {
    "Australia" is special. A story counts as mentioning it when it says so OR
    when its publisher's web address ends in .au — Australian outlets rarely put
    "Australia" in a headline. It's sent to the search only from [brackets].
-   A publisher in Papua New Guinea (.pg) counts as mentioning PNG the same way. */
+   A publisher in Papua New Guinea (.pg) counts as mentioning PNG the same way.
+
+   PNG's own outlets are thin in a normal Google News search. A story can sit in
+   Google's index and only come back when Google is asked for that outlet's site
+   by name — and one site per ask: an OR of several sites drops NBC PNG's stories
+   (checked 27 Nov 2026). So a keyword that names PNG, plus something else, also
+   asks Google once for each site in PG_SITES ("Lake Murray" site:nbc.com.pg). */
 
 const KW_STOP = new Set("the a an and for of in on to at with news latest".split(" "));
 const KW_CONTEXT = new Set(["australia", "australian", "aussie"]);
@@ -405,6 +411,9 @@ const KW_ALIAS = {
   vic: ["Victoria", "Vic"], nz: ["New Zealand", "NZ"], uk: ["UK", "Britain", "United Kingdom"],
   usa: ["USA", "United States"],
 };
+
+const PG_SITES = ["nbc.com.pg", "postcourier.com.pg", "thenational.com.pg"];
+const isPngTerm = (t) => /^(png|papua new guinea)$/i.test(String(t).trim());
 
 const kwCache = new Map();
 function parseKeyword(raw) {
@@ -420,7 +429,7 @@ function parseKeyword(raw) {
   if (/[()]/.test(s)) {
     // hand-written Google search — pass it through, lightly sanity-check the results
     const words = sigWords(s);
-    out = { label: label || typed, query: s, bing: words.join(" "), groups: words.length ? [words] : [], need: words.length ? 1 : 0, must: [], prefer: [], not: [] };
+    out = { label: label || typed, query: s, bing: words.join(" "), groups: words.length ? [words] : [], need: words.length ? 1 : 0, must: [], sites: [], prefer: [], not: [] };
   } else {
     const prefer = [], not = [];
     s = s.replace(/\[([^\]]*)\]/g, (m, inner) => {
@@ -470,11 +479,15 @@ function parseKeyword(raw) {
     const query = (asked.map(orJoin).join(" ") + (steer.length ? " " + orJoin(steer) : "")).slice(0, 280);
     // Bing's feed returns nothing for OR / brackets / quotes, so it gets plain words: the first of each part
     const bing = asked.map((g) => g[0]).concat(steer.slice(0, 1)).join(" ").slice(0, 120);
+    // a PNG topic also asks each PNG outlet by name. The place is left out of that search: the site says it.
+    const namesPng = groups.some((g) => g.some(isPngTerm)) || prefer.some(isPngTerm);
+    const local = asked.filter((g) => !g.some(isPngTerm));
+    const sites = namesPng && local.length ? PG_SITES.map((site) => (local.map(orJoin).join(" ").slice(0, 250) + " site:" + site)) : [];
     out = {
       label: label || (structured ? groups[0][0] : s.replace(/(^|\s)-\S+/g, " ").replace(/"/g, "").replace(/\s+/g, " ").trim() || typed),
       query, bing, groups, prefer, not,
       need: structured || n <= 3 ? n : n - 1,
-      must: places,
+      must: places, sites,
     };
   }
   kwCache.set(raw, out);
@@ -528,7 +541,7 @@ function activeSections() {
     if (p.au) groups.push(["Australia", "Aussie"]);
     sections.push({
       kind: "preset", key: "p:" + p.id, label: p.label, query: p.query, bing: p.bing || p.label,
-      groups, need: groups.length, must: [], prefer: p.prefer || [], not: [],
+      groups, need: groups.length, must: [], sites: [], prefer: p.prefer || [], not: [],
       ladder: days < 7 ? [days, 7] : [days],
     });
   }
@@ -537,7 +550,7 @@ function activeSections() {
     // niche keywords widen their window (week → month → year) until they find something
     // the topic key follows the section's name, so re-tuning a keyword's rule keeps its blocked publishers
     sections.push({ kind: "custom", key: "k:" + k.label.toLowerCase(), label: k.label, query: k.query, bing: k.bing, groups: k.groups, need: k.need,
-      must: k.must, prefer: k.prefer, not: k.not, ladder: [7, 30, 365] });
+      must: k.must, sites: k.sites, prefer: k.prefer, not: k.not, ladder: [7, 30, 365] });
   }
   return sections;
 }
@@ -698,7 +711,11 @@ async function loadSection(section, ctx) {
   const pool = new Map(); // every Google story seen so far, across the windows tried
   let googleOk = false, googleDown = false, bing = null, bingTried = false;
   let kept = [], days = section.ladder[0];
-  const everything = () => [...pool.values()].concat(bing || []).sort((a, b) => (b.date || 0) - (a.date || 0));
+  // PNG topics: the PNG outlets asked for by name, once, over the past year (see the keyword notes).
+  // They run alongside the first search. They are a bonus: one that fails is simply left out.
+  const named = [];
+  const everything = () => [...pool.values()].concat(named, bing || []).sort((a, b) => (b.date || 0) - (a.date || 0));
+  let namedAsks = section.sites.length ? Promise.allSettled(section.sites.map((q) => fetchFeed("g", q, 365))) : null;
   for (const d of section.ladder) {
     days = d;
     if (!googleDown) {
@@ -713,6 +730,10 @@ async function loadSection(section, ctx) {
           if (k && !pool.has(k)) pool.set(k, it);
         }
       } else if (!googleOk) googleDown = true;
+    }
+    if (namedAsks) {
+      for (const r of await namedAsks) if (r.status === "fulfilled") named.push(...r.value.filter((it) => !isIndexPage(it)));
+      namedAsks = null;
     }
     kept = pick(everything(), section, d, ctx);
     if ((googleDown || (kept.length < MIN_STORIES && section.kind === "custom")) && !bingTried) {
@@ -733,6 +754,13 @@ async function loadSection(section, ctx) {
     days = 365;
   }
   return { kept, days };
+}
+
+/* Asking Google for a whole site also returns the site's own listing pages ("Lake Murray Archives",
+   "My Blog Page | … | Page 882", the home page). Those aren't stories. */
+function isIndexPage(it) {
+  const t = it.title.trim();
+  return /\bArchives$/i.test(t) || /^My Blog Page\b/i.test(t) || /\|\s*Page \d+\s*$/i.test(t) || t.toLowerCase() === (it.src || "").trim().toLowerCase();
 }
 
 async function fetchFeed(source, query, days) {

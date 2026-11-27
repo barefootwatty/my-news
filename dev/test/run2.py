@@ -43,9 +43,16 @@ with sync_playwright() as p:
         four_words_need: parseKeyword('nt barra fishing lodge').need,
         four_words_may_miss_one: keep('nt barra fishing lodge', 'NT barra lodge reopens for the run-off', 'www.example.com'),
         four_words_never_the_place: keep('nt barra fishing lodge', 'Barra fishing lodge reopens for the run-off', 'www.example.com'),
+        sites_tuned: parseKeyword(TUNED.murray).sites, sites_plain: parseKeyword('Lake Murray PNG').sites[0],
+        sites_none: ['Bensbach', 'PNG', 'png news', 'F-150, Australia', 'barramundi stocking', '(png OR fiji) rugby'].map(k => parseKeyword(k).sites.length),
+        sites_bracket: parseKeyword('Bensbach [PNG]').sites[0],
+        index_pages: ['Lake Murray Archives', 'My Blog Page | The National | Page 882', 'NBC PNG News', 'Lake Murray dries up as severe drought hits PNG'].map(t => isIndexPage({ title: t, src: 'NBC PNG News' })),
       }; }""")
     want = {"need3": 3, "american_out": 0, "says_png_in": 1, "pg_paper_in": 1, "tuned_pg_paper_in": 1, "tuned_american_out": 0, "loop_png_counts": True,
-            "plain_com_does_not": False, "four_words_need": 3, "four_words_may_miss_one": 1, "four_words_never_the_place": 0}
+            "plain_com_does_not": False, "four_words_need": 3, "four_words_may_miss_one": 1, "four_words_never_the_place": 0,
+            "sites_tuned": ['"Lake Murray" site:nbc.com.pg', '"Lake Murray" site:postcourier.com.pg', '"Lake Murray" site:thenational.com.pg'],
+            "sites_plain": "Lake Murray site:nbc.com.pg", "sites_none": [0, 0, 0, 0, 0, 0], "sites_bracket": "Bensbach site:nbc.com.pg",
+            "index_pages": [True, True, True, False]}
     assert res["plain_rule"] == want, res["plain_rule"]
     # --- E: kebab actions ---
     first = pg.locator(".section").nth(1).locator(".cardwrap").nth(1)
@@ -65,18 +72,20 @@ with sync_playwright() as p:
     # --- F: swipe left with mouse drag (desktop) ---
     target = pg.locator(".section").nth(0).locator(".cardwrap").nth(1)
     tt = target.locator(".headline").text_content()
-    box = target.bounding_box()
+    box = centre(pg, target)  # the earlier taps leave the page wherever they scrolled it
     pg.mouse.move(box["x"] + box["width"] - 30, box["y"] + 20); pg.mouse.down()
     for dx in range(0, 200, 20): pg.mouse.move(box["x"] + box["width"] - 30 - dx, box["y"] + 22)
     pg.mouse.up(); pg.wait_for_timeout(700)
     res["swipe_left"] = {"gone": pg.locator(".headline", has_text=tt).count() == 0, "pages": len(ctx.pages)}
+    assert res["swipe_left"]["gone"], res["swipe_left"]
     # swipe right opens the actions row, doesn't open the article
     target = pg.locator(".section").nth(0).locator(".cardwrap").nth(1)
-    box = target.bounding_box()
+    box = centre(pg, target)
     pg.mouse.move(box["x"] + 40, box["y"] + 20); pg.mouse.down()
     for dx in range(0, 130, 13): pg.mouse.move(box["x"] + 40 + dx, box["y"] + 21)
     pg.mouse.up(); pg.wait_for_timeout(400)
     res["swipe_right"] = {"acts_open": target.locator(".acts").is_visible(), "pages": len(ctx.pages)}
+    assert res["swipe_right"]["acts_open"], res["swipe_right"]
     # plain click on the summary opens the article in a new tab
     with ctx.expect_page() as newp:
         pg.locator(".section").nth(0).locator(".cardwrap").nth(2).locator(".meta .when").click()
@@ -109,7 +118,7 @@ with sync_playwright() as p:
     wp.locator("#btn-refresh").click(); wait_feed(wp)
     w["after_refresh"] = [pubs(0), pubs(1)]
     # swipe right opens the same menu, with the Wrong topic button in it
-    sw = wp.locator(".section").nth(1).locator(".cardwrap").nth(0); sw.scroll_into_view_if_needed(); box = sw.bounding_box()
+    sw = wp.locator(".section").nth(1).locator(".cardwrap").nth(0); box = centre(wp, sw)
     wp.mouse.move(box["x"] + 40, box["y"] + 20); wp.mouse.down()
     for dx in range(0, 130, 13): wp.mouse.move(box["x"] + 40 + dx, box["y"] + 21)
     wp.mouse.up(); wp.wait_for_timeout(400)
@@ -137,7 +146,8 @@ with sync_playwright() as p:
     uctx.close()
     u = res["upgrade_again"]
     assert u["v"] == 6 and u["kws"][0].startswith("Lake Murray PNG: Lake Murray, PNG /") and u["kws"][1] == "Darwin Harbour", u
-    assert len(u["murray"]) == 3 and not any("South Carolina" in t or "dam water" in t or "Boater" in t for t in u["murray"]) and not uerrs, u
+    # 4 = three from the normal search + NBC PNG's story, which only comes back when its site is asked for by name
+    assert len(u["murray"]) == 4 and any("dries up" in t for t in u["murray"]) and not any("South Carolina" in t or "dam water" in t or "Boater" in t or "Archives" in t for t in u["murray"]) and not uerrs, u
     # --- G: setup link ---
     link = pg.evaluate("setupLink()")
     res["link_len"] = len(link); res["errors_a"] = errs
@@ -175,7 +185,7 @@ with sync_playwright() as p:
     pg.goto(URL); wait_feed(pg); pg.wait_for_timeout(500); pg.screenshot(path=shot("shot-photo.png")); ctx.close()
     # --- K: service worker offline fallback ---
     ctx, pg, errs = page_for(b, "light")
-    pg.goto("http://localhost:8765/"); wait_feed(pg)
+    pg.goto("http://localhost:%s/" % PORT); wait_feed(pg)
     pg.evaluate("navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready)")
     pg.wait_for_timeout(1500)
     res["sw_cache"] = pg.evaluate("caches.keys().then(async ks => [ks, (await (await caches.open(ks[0])).keys()).length])")

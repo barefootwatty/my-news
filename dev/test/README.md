@@ -20,6 +20,7 @@ so none of this is served on the live site.
     python run.py               # smoke test, exits non-zero on failure
     python run2.py              # interaction tests, prints a JSON report
     # optional: CHROME=/path/to/chrome to use an installed browser
+    # optional: PORT=8791 on all three commands when something else is using 8765
 
 Screenshots and `report.json` land in `out/`.
 
@@ -35,7 +36,7 @@ feeds returned on 24 Nov 2026.
 | Yellowcheek | nothing recent; a namesake fish removed by `-darter`; one Bing story matched on its description |
 | NT business grants | needs a place, a money word and an Australian publisher; Bing adds a third story at 30 days |
 | Bensbach | house listings removed by `-Road`; the only story is a rare-term fallback |
-| Lake Murray PNG | South Carolina stories dropped; 3 PNG stories kept, one from a `.pg` paper whose headline never says PNG |
+| Lake Murray PNG | South Carolina stories dropped; 4 PNG stories kept: one from a `.pg` paper whose headline never says PNG, and NBC PNG's, which only the ask for its site by name returns. Listing pages from those asks dropped; one of the three asks fails and is ignored |
 | Fly tying | all fly tying stories count; the streamer one leads |
 | AFANT | one headline match plus two rare-term fallbacks; a Maltese association dropped |
 | F-150 | Japan-market story dropped; Australian publishers kept |
