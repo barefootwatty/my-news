@@ -84,7 +84,7 @@ Stored as plain strings in `settings.customKeywords`, so old keywords keep worki
 | Typed | Means |
 |---|---|
 | `Bensbach` | stories must mention it |
-| `barramundi stocking` | plain words: both must appear (3+ plain words may miss one) |
+| `barramundi stocking` | plain words: with up to three, every word must appear. Four or more may miss one, but never a place short form (`PNG`, `NT`, `Qld` and the rest of `KW_ALIAS`): those come back from `parseKeyword` as `must` |
 | `yellowcheek / yellow cheek` | slash (with spaces) = either-or |
 | `Lake Murray, PNG / Papua` | comma = must-have-both, every part required |
 | `fly tying [streamer]` | brackets float matching stories to the top, but aren't required |
@@ -105,9 +105,16 @@ when its publisher is Australian: site ending `.au`, "australia" in the site
 name, or listed in `AU_HOSTS` (Australian sites on a plain `.com` / `.io`: add to it when one turns up). It is sent to Google as a search word only from
 square brackets.
 
+PNG works the same way (27 Nov 2026). A publisher whose site ends in `.pg` (The
+National, Post-Courier, NBC PNG, EMTV), or is listed in `PG_HOSTS` (PNG outlets
+on a plain `.com`), counts as mentioning "PNG" and "Papua New Guinea". PNG
+papers write "Lake Murray communities struggle to find water", never "PNG".
+
 `RETUNE` in `app.js` is a one-off map that swaps Glenn's six dead keywords (and
 the first attempt at tuning them) for the versions in `TUNED`. Tune a keyword for him by sending a setup
-link (below) or having him retype it.
+link (below) or having him retype it. The swap runs once per data version, so a
+keyword he retypes plain afterwards stays plain. To run it again, bump
+`DATA_VERSION` (done for v6, 27 Nov 2026: a retyped "Lake Murray PNG").
 
 ### Setup link
 
@@ -160,6 +167,15 @@ redirect page). This is the same approach as the open-source
   an active topic are never learned (`protectedTerms()`), so one "Less" on a
   Darwin story can't sink the NT section. "Start the learning fresh" in settings
   clears all three lists.
+- **Wrong topic (27 Nov 2026):** the fourth button in that same menu. It hides
+  the story and keeps its publisher out of that one topic (`settings.topicBlocks`,
+  cap 300; each entry is topic key, topic name, publisher name, publisher site
+  and the hidden story). `pick()` skips a story when the publisher's name or
+  site matches a block for the section. The topic key is `p:<preset id>` or
+  `k:<section name, lower-case>`, so re-tuning a keyword's rule keeps its
+  blocks. Settings lists them under "Publishers blocked from a topic"; tapping a
+  name removes the block and un-hides the story. Not cleared by "Start the
+  learning fresh", and not carried by the setup link.
 - Looks: `THEMES` in `app.js`. `auto` = Day/Night following the device. Day and
   Night are the Angling Adventures palette (navy #093657, sky #1798CF, gold
   #E0A23B — **no orange, ever**; source of truth is the Drive doc
@@ -174,7 +190,7 @@ redirect page). This is the same approach as the open-source
   (`previewWatch`), 4 at a time (`queuePreview`).
 - Junk summary filter: `cleanSummary()` in `app.js`.
 - Shipping UI changes: bump `?v=N` on style.css/app.js in index.html AND the
-  matching entries + cache name in `sw.js`. If you add a file to the `FILES`
+  matching entries + cache name in `sw.js`. (Both are `v=7` as of 27 Nov 2026.) If you add a file to the `FILES`
   list in `sw.js`, make sure it exists — one 404 there and the new service
   worker never installs.
 

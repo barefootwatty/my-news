@@ -259,6 +259,41 @@ Run with `dev_server.py` and the section 7 snippet. Offline tests pass before an
 - **Heads-up:** the cloud session merged this branch to `main` and pushed it live (`e6f77b6`) the same
   evening. The Mac work was merged on top of that and shipped as version 6 of the app files.
 
+## 7c. Three fixes, 27 Nov 2026 (Claude Code, Glenn's Mac)
+
+Found by Glenn on the live app. Tested on the real feeds and offline (`run.py`, `run2.py` pass).
+
+- **Plain keywords keep the place.** Up to three plain words: all required. Four or more may miss
+  one, never a place short form (`PNG`, `NT`, `Qld`…). `parseKeyword` returns those as `must`.
+  Before: a hand-typed "Lake Murray PNG" showed 8 American stories. After: none.
+- **The upgrade runs again** (`DATA_VERSION` 6), so a plain "lake murray png" saved after the first
+  upgrade is swapped for the tuned rule.
+- **A `.pg` publisher counts as mentioning PNG** (`isPg`, `PG_HOSTS`). The tuned Lake Murray rule
+  went from 2 stories to 6 in the past year (5 shown: the year-long look-back caps at 5).
+- **"Wrong topic" button** in the story menu (swipe right or ⋯). Blocks that publisher for that
+  topic only. Listed, with undo, in settings. See `MAINTENANCE.md`.
+- App files are `v=7`.
+
+### PNG outlets: what was found (not built)
+
+Checked from Glenn's Mac on 27 Nov 2026. Nothing here is built yet.
+
+- **Google already has NBC PNG.** `"Lake Murray" site:nbc.com.pg` returns "Lake Murray dries up as
+  severe drought hits PNG's Western Province" (7 Aug 2026). The normal search never returns it, and
+  neither does a search naming several sites with OR. NBC PNG has to be asked for on its own.
+- **Post-Courier:** WordPress. Open feed at `/feed/`, and an open search at
+  `/wp-json/wp/v2/posts?search=…` (date, link, title, excerpt, picture). Its search *feed* returns nothing.
+  The live preview function reached it from Vercel.
+- **The National:** WordPress behind Cloudflare. Search feed (`/?s=…&feed=rss2`) and the same JSON
+  search answered the Mac; `/feed/` got a Cloudflare challenge. The live preview function got no
+  picture or summary from it, so Vercel is likely blocked. Its `robots.txt` shuts out Bing entirely,
+  which is why Bing never has it.
+- **NBC PNG:** `www.nbc.com.pg` has no feed and bars robots from `/search`. Its WordPress back end,
+  `wp.nbc.com.pg`, has an open `/feed/` and the same JSON search. That address is not advertised.
+- **Loop PNG:** `looppng.com` no longer resolves. Nothing to add.
+- Cheapest build: for keywords that name PNG, one extra Google ask per outlet (`<search> site:nbc.com.pg`
+  and so on) through the existing `api/feed.js`. No new source, no new function code.
+
 ## 8. Decisions already made
 
 Don't re-open these unless Glenn does.

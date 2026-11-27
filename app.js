@@ -2,7 +2,7 @@
 
 const STORE_KEY = "mynews.settings.v1";
 const PHOTO_KEY = "mynews.bgphoto.v1"; // stored separately: photos are big
-const DATA_VERSION = 5;
+const DATA_VERSION = 6;
 
 /* Each preset has a Google News query, and optionally `match`: words the story
    must mention (word-start match, so "fish" also catches "fishing").
@@ -69,13 +69,17 @@ const DEFAULTS = {
   hiddenKeys: [],   // stories swiped away — never shown again
   boosts: [],       // words from "more like this" headlines — float similar stories up
   brakes: [],       // words from "less like this" headlines — sink or skip similar stories
+  topicBlocks: [],  // "wrong topic": a publisher kept out of ONE topic — { t: topic key, n: topic name, p: publisher, h: site, k: hidden story }
   swipeTipSeen: false,
 };
 
 /* One-off re-tunes (Nov 2026). Glenn's long keywords were searched as exact
    phrases and never found a story; these swap them for versions that do. The
    second block upgrades the first attempt after it was checked against the real
-   feeds. Keys are lower-case, single-spaced. */
+   feeds. Keys are lower-case, single-spaced.
+   The swap runs once per data version, so a keyword retyped by hand afterwards
+   stays as typed until DATA_VERSION is next bumped (v6 did that for a retyped
+   "lake murray png"). */
 const TUNED = {
   yellowcheek: "Yellowcheek: yellowcheek / yellow cheek carp / Elopichthys, -darter",
   grants: "NT business grants: Northern Territory / NT / Territorian / Darwin, grant / voucher / rebate / funding round, business / industry / tourism / operator / trader, Australia",
@@ -119,9 +123,10 @@ function save() {
 }
 
 function migrate(s) {
-  for (const k of ["presetIds", "customKeywords", "muteWords", "hiddenKeys", "boosts", "brakes"]) {
+  for (const k of ["presetIds", "customKeywords", "muteWords", "hiddenKeys", "boosts", "brakes", "topicBlocks"]) {
     if (!Array.isArray(s[k])) s[k] = [];
   }
+  s.topicBlocks = s.topicBlocks.filter((b) => b && typeof b.t === "string" && typeof b.p === "string");
   if (!THEMES.some((t) => t.id === s.theme)) s.theme = "auto"; // older colour themes retired
   if ((s.v || 0) < DATA_VERSION) {
     const out = [];
@@ -227,6 +232,7 @@ function showSetup(editing) {
   renderPresetChips();
   renderCustomChips();
   renderMuteChips();
+  renderBlockList();
   renderVoiceOptions();
   $("mute-on").checked = settings.muteOn;
   $("rate-sel").value = String(settings.rate);
@@ -380,12 +386,16 @@ function chosenVoice() {
      Bensbach, -Road                 a leading "-" leaves out stories with that word
      NT grants: NT, grant / funding  "Name: ..." gives the section a short name
 
-   Plain keywords of 3+ words may miss one word (so "kakadu barra fishing news"
-   still finds things); anything written with commas is strict.
+   Plain keywords of up to three words need every word. Four or more may miss
+   one word (so "kakadu barra fishing lodge" still finds things), but never a
+   place: "PNG", "NT", "Qld" and the other short forms in KW_ALIAS must always be
+   in the story — otherwise "Lake Murray PNG" lets in every American Lake Murray.
+   Anything written with commas is strict.
 
    "Australia" is special. A story counts as mentioning it when it says so OR
    when its publisher's web address ends in .au — Australian outlets rarely put
-   "Australia" in a headline. It's sent to the search only from [brackets]. */
+   "Australia" in a headline. It's sent to the search only from [brackets].
+   A publisher in Papua New Guinea (.pg) counts as mentioning PNG the same way. */
 
 const KW_STOP = new Set("the a an and for of in on to at with news latest".split(" "));
 const KW_CONTEXT = new Set(["australia", "australian", "aussie"]);
@@ -410,7 +420,7 @@ function parseKeyword(raw) {
   if (/[()]/.test(s)) {
     // hand-written Google search — pass it through, lightly sanity-check the results
     const words = sigWords(s);
-    out = { label: label || typed, query: s, bing: words.join(" "), groups: words.length ? [words] : [], need: words.length ? 1 : 0, prefer: [], not: [] };
+    out = { label: label || typed, query: s, bing: words.join(" "), groups: words.length ? [words] : [], need: words.length ? 1 : 0, must: [], prefer: [], not: [] };
   } else {
     const prefer = [], not = [];
     s = s.replace(/\[([^\]]*)\]/g, (m, inner) => {
@@ -419,6 +429,7 @@ function parseKeyword(raw) {
     }).trim();
 
     let groups = [];
+    const places = []; // place short forms typed in a plain keyword: never the word that's allowed to be missing
     const structured = /,|\s\/\s|\||\sOR\s|\s\+\s/.test(s);
     if (structured) {
       for (const part of s.split(/\s*,\s*|\s+\+\s+/)) {
@@ -439,7 +450,9 @@ function parseKeyword(raw) {
         if (minus) { not.push(w); continue; }
         if (KW_STOP.has(lw)) continue;
         if (KW_CONTEXT.has(lw)) { prefer.push(w); continue; }
-        groups.push(KW_ALIAS[lw] ? KW_ALIAS[lw].slice() : [w]);
+        const g = KW_ALIAS[lw] ? KW_ALIAS[lw].slice() : [w];
+        if (KW_ALIAS[lw]) places.push(g);
+        groups.push(g);
       }
     }
     if (!groups.length && prefer.length) groups = [prefer.splice(0)]; // only steering words typed, so they are the topic
@@ -460,7 +473,8 @@ function parseKeyword(raw) {
     out = {
       label: label || (structured ? groups[0][0] : s.replace(/(^|\s)-\S+/g, " ").replace(/"/g, "").replace(/\s+/g, " ").trim() || typed),
       query, bing, groups, prefer, not,
-      need: structured || n <= 2 ? n : n - 1,
+      need: structured || n <= 3 ? n : n - 1,
+      must: places,
     };
   }
   kwCache.set(raw, out);
@@ -513,16 +527,17 @@ function activeSections() {
     const groups = p.match ? [p.match] : [];
     if (p.au) groups.push(["Australia", "Aussie"]);
     sections.push({
-      kind: "preset", label: p.label, query: p.query, bing: p.bing || p.label,
-      groups, need: groups.length, prefer: p.prefer || [], not: [],
+      kind: "preset", key: "p:" + p.id, label: p.label, query: p.query, bing: p.bing || p.label,
+      groups, need: groups.length, must: [], prefer: p.prefer || [], not: [],
       ladder: days < 7 ? [days, 7] : [days],
     });
   }
   for (const kw of settings.customKeywords) {
     const k = parseKeyword(kw);
     // niche keywords widen their window (week → month → year) until they find something
-    sections.push({ kind: "custom", label: k.label, query: k.query, bing: k.bing, groups: k.groups, need: k.need,
-      prefer: k.prefer, not: k.not, ladder: [7, 30, 365] });
+    // the topic key follows the section's name, so re-tuning a keyword's rule keeps its blocked publishers
+    sections.push({ kind: "custom", key: "k:" + k.label.toLowerCase(), label: k.label, query: k.query, bing: k.bing, groups: k.groups, need: k.need,
+      must: k.must, prefer: k.prefer, not: k.not, ladder: [7, 30, 365] });
   }
   return sections;
 }
@@ -619,7 +634,7 @@ async function buildFeed() {
   if (!settings.swipeTipSeen) {
     const tip = document.createElement("div");
     tip.className = "note tip";
-    tip.innerHTML = '<span>Swipe a story <b>left</b> to hide it, or <b>right</b> for more or less like it. The ⋯ button on each story does the same.</span>';
+    tip.innerHTML = '<span>Swipe a story <b>left</b> to hide it, or <b>right</b> for more like it, less like it, or wrong topic. The ⋯ button on each story does the same.</span>';
     const ok = document.createElement("button");
     ok.type = "button";
     ok.textContent = "Got it";
@@ -713,7 +728,7 @@ async function loadSection(section, ctx) {
   // the article even though the headline doesn't say it. Take those too, newest first.
   if (section.kind === "custom" && section.groups.length <= 1 && kept.length < MIN_STORIES && pool.size && pool.size <= RARE_POOL) {
     const have = new Set(kept.map((it) => it.dkey));
-    const loose = pick([...pool.values()].sort((a, b) => (b.date || 0) - (a.date || 0)), { ...section, groups: [], need: 0 }, 365, ctx);
+    const loose = pick([...pool.values()].sort((a, b) => (b.date || 0) - (a.date || 0)), { ...section, groups: [], need: 0, must: [] }, 365, ctx);
     kept = kept.concat(loose.filter((it) => !have.has(it.dkey)).slice(0, 5 - kept.length));
     days = 365;
   }
@@ -733,9 +748,9 @@ async function fetchFeed(source, query, days) {
     const items = source === "b" ? parseBing(xml) : parseGoogle(xml);
     for (const it of items) {
       if (it.date && isNaN(it.date)) it.date = null;
-      // an Australian publisher counts as "mentions Australia" (see the keyword notes)
+      // an Australian publisher counts as "mentions Australia", a PNG one as "mentions PNG" (see the keyword notes)
       // odd hyphens (F‑150 with a non-breaking hyphen) are read as plain ones
-      const body = (it.title + " | " + it.desc + (it.au ? " | Australia" : "")).replace(/[’‘]/g, "'").replace(/[\u2010\u2011]/g, "-");
+      const body = (it.title + " | " + it.desc + (it.au ? " | Australia" : "") + (it.pg ? " | PNG | Papua New Guinea" : "")).replace(/[’‘]/g, "'").replace(/[\u2010\u2011]/g, "-");
       it.hay = body;                          // what a keyword is tested against
       it.hayWide = body + " | " + it.src;     // presets also count the publisher's name ("Fishing World")
     }
@@ -750,14 +765,26 @@ function stripTags(html) {
   return html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/* The publisher's site, lower-case, without "www." ("" when there isn't one). */
+function hostOf(url) {
+  try { return new URL(url).hostname.toLowerCase().replace(/^www\./, ""); } catch (e) { return ""; }
+}
+const onHost = (host, list) => list.some((h) => host === h || host.endsWith("." + h));
+
 /* Is this an Australian publisher? Web address ends in .au, or has "australia" in it,
    or is one of the few big Australian outlets on a plain .com. */
 const AU_HOSTS = ["miragenews.com", "torquecafe.com", "thedriven.io"];
 function isAu(url) {
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    return /\.au$/.test(host) || host.includes("australia") || AU_HOSTS.some((h) => host === h || host.endsWith("." + h));
-  } catch (e) { return false; }
+  const host = hostOf(url);
+  return /\.au$/.test(host) || host.includes("australia") || onHost(host, AU_HOSTS);
+}
+
+/* Is this a Papua New Guinea publisher? Web address ends in .pg (The National, Post-Courier,
+   NBC PNG, EMTV), or is one of the PNG outlets on a plain .com. */
+const PG_HOSTS = ["looppng.com", "businessadvantagepng.com", "onepng.com", "pngfacts.com"];
+function isPg(url) {
+  const host = hostOf(url);
+  return /\.pg$/.test(host) || onHost(host, PG_HOSTS);
 }
 
 function parseGoogle(xml) {
@@ -775,7 +802,8 @@ function parseGoogle(xml) {
     if (title && /^https?:\/\//i.test(link)) {
       // the description repeats the publisher's name in a <font> tag — drop it so it isn't matched as story text
       const desc = stripTags(text(item, "description").replace(/<font\b[^>]*>[\s\S]*?<\/font>/gi, " "));
-      items.push({ title, link, src, date: pub ? new Date(pub) : null, desc, au: isAu(srcEl && srcEl.getAttribute("url")), from: "g" });
+      const site = srcEl && srcEl.getAttribute("url"); // the publisher's own site
+      items.push({ title, link, src, date: pub ? new Date(pub) : null, desc, host: hostOf(site), au: isAu(site), pg: isPg(site), from: "g" });
     }
   }
   return items;
@@ -815,7 +843,7 @@ function parseBing(xml) {
     items.push({
       title, link, src: stripTags(tag("News:Source")), date: pub ? new Date(pub) : null,
       desc: stripTags(decodeEntities(tag("description"))),
-      image: /^https:\/\//i.test(image) ? image : null, au: isAu(link), from: "b",
+      image: /^https:\/\//i.test(image) ? image : null, host: hostOf(link), au: isAu(link), pg: isPg(link), from: "b",
     });
   }
   return items;
@@ -827,6 +855,7 @@ function pick(items, section, days, ctx) {
   const maxAge = (days > 0 ? days : 365) * 864e5;
   const muted = settings.muteOn ? settings.muteWords.map((w) => w.toLowerCase()) : [];
   const hidden = new Set(settings.hiddenKeys);
+  const blocks = blocksFor(section.key);
   const seen = new Set();
   const kept = [];
   for (const it of items) {
@@ -836,11 +865,13 @@ function pick(items, section, days, ctx) {
     if (!key || seen.has(dkey) || ctx.seenGlobal.has(dkey) || hidden.has(key)) continue;
     const lowTitle = it.title.toLowerCase();
     if (muted.some((w) => lowTitle.includes(w))) continue;
+    if (blocks.length && isBlocked(it, blocks)) continue; // "wrong topic": this publisher is kept out of this topic
     // the story must actually mention the topic — search engines pad with "related" stories
     const hay = section.kind === "preset" ? it.hayWide : it.hay;
     if (section.not.length && anyTerm(hay, section.not)) continue;
     const hits = groupsHit(hay, section.groups);
     if (hits < section.need) continue;
+    if (section.must.length && section.must.some((g) => !anyTerm(hay, g))) continue; // a place word is never the one missing
     const brake = hitCount(it.title, settings.brakes);
     if (brake >= 2) continue; // clearly the kind of story they said "less of"
     seen.add(dkey);
@@ -882,20 +913,99 @@ function renderSection(block, section, result, ctx) {
   }
   const sheet = document.createElement("div");
   sheet.className = "sheet";
-  show.forEach((it, i) => sheet.appendChild(makeCard(it, i === 0)));
+  show.forEach((it, i) => sheet.appendChild(makeCard(it, i === 0, section)));
   block.appendChild(sheet);
 }
 
-/* ---------- story cards + swipe (left = hide, right = more/less) ---------- */
+/* ---------- wrong topic: keep one publisher out of one topic ----------
+   "Lake Murray" in South Carolina has its own papers; they never write about the
+   one in PNG. Tapping "Wrong topic" hides the story and keeps that publisher out
+   of that topic only — it still shows in every other topic. A block matches on
+   the publisher's name or its site, so it holds across both news sources. */
+
+const SHARED_HOSTS = ["msn.com", "yahoo.com", "google.com"]; // carry many publishers: never block by these sites
+
+function blocksFor(topicKey) {
+  return topicKey ? settings.topicBlocks.filter((b) => b.t === topicKey) : [];
+}
+function isBlocked(it, blocks) {
+  const name = (it.src || "").trim().toLowerCase();
+  return blocks.some((b) => (name && b.p.toLowerCase() === name) || (b.h && b.h === it.host));
+}
+/* Returns the publisher's name when a block was added (or already there), "" when the story names no publisher. */
+function blockPublisher(it, section) {
+  const name = (it.src || "").trim();
+  const host = it.host && !onHost(it.host, SHARED_HOSTS) ? it.host : "";
+  if (!section || !section.key || (!name && !host)) return "";
+  if (!isBlocked(it, blocksFor(section.key))) {
+    settings.topicBlocks.push({ t: section.key, n: section.label, p: name || host, h: host, k: keyOf(it.title) });
+    while (settings.topicBlocks.length > 300) settings.topicBlocks.shift();
+  }
+  return name || host;
+}
+function unblockPublisher(block) {
+  const i = settings.topicBlocks.indexOf(block);
+  if (i >= 0) settings.topicBlocks.splice(i, 1);
+  // bring back the story that was hidden with it
+  const h = settings.hiddenKeys.indexOf(block.k);
+  if (block.k && h >= 0) settings.hiddenKeys.splice(h, 1);
+  save();
+}
+
+/* Settings: the blocked publishers, topic by topic. Tap one to let it back in. */
+function renderBlockList() {
+  const box = $("block-list");
+  box.innerHTML = "";
+  const topics = new Map(); // topic key -> { name, blocks }
+  for (const b of settings.topicBlocks) {
+    if (!topics.has(b.t)) topics.set(b.t, { name: b.n || b.t, blocks: [] });
+    topics.get(b.t).blocks.push(b);
+  }
+  if (!topics.size) {
+    const none = document.createElement("p");
+    none.className = "hint";
+    none.textContent = "None blocked yet.";
+    box.appendChild(none);
+    return;
+  }
+  for (const { name, blocks } of topics.values()) {
+    const h = document.createElement("p");
+    h.className = "block-topic";
+    h.textContent = name;
+    const grid = document.createElement("div");
+    grid.className = "chip-grid";
+    for (const b of blocks) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip on";
+      chip.append(b.p);
+      chip.title = b.h || b.p;
+      chip.setAttribute("aria-label", "Let " + b.p + " back into " + name);
+      const x = document.createElement("span");
+      x.className = "x";
+      x.textContent = "×";
+      chip.appendChild(x);
+      chip.onclick = () => { unblockPublisher(b); renderBlockList(); toast(shortName(b.p) + " is back in " + name); };
+      grid.appendChild(chip);
+    }
+    box.append(h, grid);
+  }
+}
+function shortName(s) {
+  const t = String(s).split(/\s+[|–—]\s+/)[0].trim() || String(s); // "The National | Your Number One Daily!" -> "The National"
+  return t.length > 30 ? t.slice(0, 29).trimEnd() + "…" : t;
+}
+
+/* ---------- story cards + swipe (left = hide, right = more / less / wrong topic) ---------- */
 
 const KEBAB = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 
-function makeCard(it, lead) {
+function makeCard(it, lead, section) {
   const wrap = document.createElement("div");
   wrap.className = "cardwrap" + (lead ? " lead" : "");
   wrap.innerHTML = `
     <div class="under under-left" aria-hidden="true"><span>Hide</span></div>
-    <div class="under under-right" aria-hidden="true"><span>More or less like this</span></div>
+    <div class="under under-right" aria-hidden="true"><span>More, less or wrong topic</span></div>
     <div class="card">
       <div class="txt">
         <a class="headline" target="_blank" rel="noopener noreferrer" draggable="false"></a>
@@ -904,10 +1014,12 @@ function makeCard(it, lead) {
         <div class="acts" hidden>
           <button type="button" class="act more">More like this</button>
           <button type="button" class="act less">Less like this</button>
+          <button type="button" class="act wrong">Wrong topic</button>
           <button type="button" class="act hide">Hide</button>
         </div>
       </div>
     </div>`;
+  wrap._it = it;
   const card = wrap.querySelector(".card");
   const head = wrap.querySelector(".headline");
   head.textContent = it.title;
@@ -936,6 +1048,18 @@ function makeCard(it, lead) {
     toast("Less like this, noted");
   };
   wrap.querySelector(".hide").onclick = () => { removeStory(wrap, it); toast("Story hidden"); };
+  wrap.querySelector(".wrong").onclick = () => {
+    const who = blockPublisher(it, section);
+    const sheet = wrap.parentElement;
+    removeStory(wrap, it); // saves
+    if (!who) { toast("Story hidden"); return; }
+    // its other stories in this topic go too (not hidden for good: undoing the block brings them back)
+    const blocks = blocksFor(section.key);
+    for (const other of sheet ? [...sheet.querySelectorAll(".cardwrap")] : []) {
+      if (other !== wrap && other._it && isBlocked(other._it, blocks)) dropCard(other, other._it);
+    }
+    toast(shortName(who) + " blocked from this topic");
+  };
 
   if (it.from === "b") {
     // the backup source hands over the real link, a summary and a picture up front
@@ -1040,6 +1164,11 @@ function attachSwipe(wrap, card, it, toggleActs) {
 function removeStory(wrap, it) {
   remember(settings.hiddenKeys, [keyOf(it.title)], 500);
   save();
+  dropCard(wrap, it);
+}
+
+/* Take a story off the page (without remembering it as hidden). */
+function dropCard(wrap, it) {
   for (const arr of Object.values(latestBySection)) {
     const i = arr.indexOf(it);
     if (i >= 0) arr.splice(i, 1);

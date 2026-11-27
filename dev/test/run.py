@@ -7,7 +7,7 @@ from run_common import *
 EXPECT = {  # section -> (stories, note starts with, empty/error text starts with)
     "Top End & NT": (7, None, None), "Fishing": (3, None, None), "Good News": (2, None, None),
     "Yellowcheek": (3, "Quiet topic", None), "NT business grants": (3, "Quiet week", None),
-    "Bensbach": (1, "Quiet topic", None), "Lake Murray PNG": (2, None, None),
+    "Bensbach": (1, "Quiet topic", None), "Lake Murray PNG": (3, None, None),
     "Fly tying": (3, None, None), "AFANT": (3, "Quiet topic", None), "F-150": (3, "Quiet week", None),
     "googledown": (2, None, None), "downtest": (0, None, "Couldn't reach the news sources"),
 }

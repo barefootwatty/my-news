@@ -25,7 +25,28 @@ with sync_playwright() as p:
         if got != want: bad.append((term, text, want, got))
     res["matcher_failures"] = bad
     res["parse"] = pg.evaluate("""() => ['barramundi','Darwin Harbour','nt fishing news','"Top End" tourism','kakadu barra fishing australia','yellowcheek / yellow cheek','Lake Murray, PNG / Papua',
-       'F-150 [Australia / Aussie]','NT grants: NT, grant / funding','(afl OR nrl) grand final','AC/DC tour','Star Wars: Andor','australia','   ','a|b','Crocs footy'].map(k => { const r = parseKeyword(k); return [k, r.label, r.query, JSON.stringify(r.groups), r.need, r.prefer.join('/')]; })""")
+       'F-150 [Australia / Aussie]','NT grants: NT, grant / funding','(afl OR nrl) grand final','AC/DC tour','Star Wars: Andor','australia','   ','a|b','Crocs footy',
+       'Lake Murray PNG','kakadu barra fishing news','nt barra fishing lodge'].map(k => { const r = parseKeyword(k); return [k, r.label, r.query, JSON.stringify(r.groups), r.need, r.prefer.join('/'), JSON.stringify(r.must)]; })""")
+    # --- P: plain keywords keep the place; a .pg publisher counts as PNG ---
+    res["plain_rule"] = pg.evaluate("""() => {
+      const sec = (kw) => { const k = parseKeyword(kw); return { kind: 'custom', key: 'k:test', groups: k.groups, need: k.need, must: k.must, prefer: k.prefer, not: k.not }; };
+      const story = (title, site) => { const pgp = isPg('https://' + site); return { title, desc: '', src: 'X', host: hostOf('https://' + site), date: new Date(), hay: title + (pgp ? ' | PNG | Papua New Guinea' : ''), hayWide: title }; };
+      const keep = (kw, title, site) => pick([story(title, site)], sec(kw), 7, { seenGlobal: new Set() }).length;
+      return {
+        need3: parseKeyword('Lake Murray PNG').need,
+        american_out: keep('Lake Murray PNG', 'Bass Pro Shop Opening Near Lake Murray', 'www.thestate.com'),
+        says_png_in: keep('Lake Murray PNG', 'VIDEO: Lake Murray, Papua New Guinea', 'www.abc.net.au'),
+        pg_paper_in: keep('Lake Murray PNG', 'Lake Murray communities struggle to find water', 'www.thenational.com.pg'),
+        tuned_pg_paper_in: keep(TUNED.murray, 'Lake Murray communities struggle to find water', 'www.thenational.com.pg'),
+        tuned_american_out: keep(TUNED.murray, 'Lake Murray communities struggle to find water', 'www.thestate.com'),
+        loop_png_counts: isPg('https://www.looppng.com/x'), plain_com_does_not: isPg('https://www.example.com/x'),
+        four_words_need: parseKeyword('nt barra fishing lodge').need,
+        four_words_may_miss_one: keep('nt barra fishing lodge', 'NT barra lodge reopens for the run-off', 'www.example.com'),
+        four_words_never_the_place: keep('nt barra fishing lodge', 'Barra fishing lodge reopens for the run-off', 'www.example.com'),
+      }; }""")
+    want = {"need3": 3, "american_out": 0, "says_png_in": 1, "pg_paper_in": 1, "tuned_pg_paper_in": 1, "tuned_american_out": 0, "loop_png_counts": True,
+            "plain_com_does_not": False, "four_words_need": 3, "four_words_may_miss_one": 1, "four_words_never_the_place": 0}
+    assert res["plain_rule"] == want, res["plain_rule"]
     # --- E: kebab actions ---
     first = pg.locator(".section").nth(1).locator(".cardwrap").nth(1)
     title = first.locator(".headline").text_content()
@@ -74,6 +95,49 @@ with sync_playwright() as p:
     pg.click("#btn-done"); wait_feed(pg)
     res["muted_gone"] = pg.locator(".headline", has_text="storms").count() == 0
     res["new_section"] = pg.evaluate("[...document.querySelectorAll('.section')].map(s => [s.querySelector('h2').textContent, s.querySelectorAll('.cardwrap').length, (s.querySelector('.empty')||{}).textContent||''] ).filter(x => x[0] === 'Darwin Harbour')")
+    # --- W: "Wrong topic" keeps one publisher out of one topic only, and settings can undo it ---
+    wst = dict(OLD); wst.update({"v": 6, "theme": "day", "presetIds": ["nt", "fishing"], "customKeywords": []})
+    wctx, wp, werrs = page_for(b, "light", store=wst); wp.goto(URL); wait_feed(wp)
+    pubs = lambda i: wp.evaluate("i => [...document.querySelectorAll('.section')[i].querySelectorAll('.cardwrap:not(.gone) .src')].map(e => e.textContent)", i)
+    w = {"before": [pubs(0), pubs(1)]}
+    card = wp.locator(".section").nth(0).locator(".cardwrap").filter(has=wp.locator(".src", has_text="NT News")).first
+    wtitle = card.locator(".headline").text_content()
+    card.locator(".kebab").click(); card.locator(".act.wrong").click(); wp.wait_for_timeout(700)
+    w["toast"] = wp.locator("#toast").text_content()
+    w["after"] = [pubs(0), pubs(1)]
+    w["blocks"] = wp.evaluate("JSON.parse(localStorage.getItem('mynews.settings.v1')).topicBlocks")
+    wp.locator("#btn-refresh").click(); wait_feed(wp)
+    w["after_refresh"] = [pubs(0), pubs(1)]
+    # swipe right opens the same menu, with the Wrong topic button in it
+    sw = wp.locator(".section").nth(1).locator(".cardwrap").nth(0); sw.scroll_into_view_if_needed(); box = sw.bounding_box()
+    wp.mouse.move(box["x"] + 40, box["y"] + 20); wp.mouse.down()
+    for dx in range(0, 130, 13): wp.mouse.move(box["x"] + 40 + dx, box["y"] + 21)
+    wp.mouse.up(); wp.wait_for_timeout(400)
+    w["swipe_menu_has_it"] = sw.locator(".act.wrong").is_visible()
+    wp.locator("#btn-settings").click(); wp.wait_for_timeout(300)
+    w["settings_list"] = wp.locator("#block-list").inner_text()
+    wp.locator("#block-list").scroll_into_view_if_needed(); wp.screenshot(path=shot("shot-blocked.png"))
+    wp.locator("#block-list .chip").first.click(); wp.wait_for_timeout(200)
+    w["settings_after_undo"] = wp.locator("#block-list").inner_text()
+    wp.click("#btn-done"); wait_feed(wp)
+    w["after_undo"] = [pubs(0), pubs(1)]
+    w["hidden_story_back"] = wp.locator(".headline", has_text=wtitle).count() == 1
+    w["errors"] = werrs; res["wrong_topic"] = w; wctx.close()
+    assert w["before"][0].count("NT News") == 2 and "NT News" in w["before"][1], w
+    assert "NT News" not in w["after"][0] and "NT News" in w["after"][1], w            # gone from Top End only
+    assert "NT News" not in w["after_refresh"][0] and "NT News" in w["after_refresh"][1], w
+    assert len(w["blocks"]) == 1 and w["blocks"][0]["t"] == "p:nt" and w["blocks"][0]["p"] == "NT News", w
+    assert w["swipe_menu_has_it"] and "Top End & NT" in w["settings_list"] and "NT News" in w["settings_list"], w
+    assert "None blocked" in w["settings_after_undo"] and w["after_undo"][0].count("NT News") == 2 and w["hidden_story_back"] and not werrs, w
+    # --- U: the upgrade runs again: a plain "Lake Murray PNG" retyped after the first upgrade is swapped for the tuned rule ---
+    ust = dict(OLD); ust.update({"v": 5, "theme": "day", "presetIds": [], "customKeywords": ["Lake Murray PNG", "Darwin Harbour"]})
+    uctx, up, uerrs = page_for(b, "light", store=ust); up.goto(URL); wait_feed(up)
+    res["upgrade_again"] = up.evaluate("""() => { const s = JSON.parse(localStorage.getItem('mynews.settings.v1')); return { v: s.v, kws: s.customKeywords,
+      murray: [...document.querySelectorAll('.section')].filter(x => x.querySelector('h2').textContent === 'Lake Murray PNG').map(x => [...x.querySelectorAll('.headline')].map(h => h.textContent))[0] }; }""")
+    uctx.close()
+    u = res["upgrade_again"]
+    assert u["v"] == 6 and u["kws"][0].startswith("Lake Murray PNG: Lake Murray, PNG /") and u["kws"][1] == "Darwin Harbour", u
+    assert len(u["murray"]) == 3 and not any("South Carolina" in t or "dam water" in t or "Boater" in t for t in u["murray"]) and not uerrs, u
     # --- G: setup link ---
     link = pg.evaluate("setupLink()")
     res["link_len"] = len(link); res["errors_a"] = errs

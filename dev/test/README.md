@@ -35,12 +35,16 @@ feeds returned on 24 Nov 2026.
 | Yellowcheek | nothing recent; a namesake fish removed by `-darter`; one Bing story matched on its description |
 | NT business grants | needs a place, a money word and an Australian publisher; Bing adds a third story at 30 days |
 | Bensbach | house listings removed by `-Road`; the only story is a rare-term fallback |
-| Lake Murray PNG | South Carolina stories dropped; 2 PNG stories kept |
+| Lake Murray PNG | South Carolina stories dropped; 3 PNG stories kept, one from a `.pg` paper whose headline never says PNG |
 | Fly tying | all fly tying stories count; the streamer one leads |
 | AFANT | one headline match plus two rare-term fallbacks; a Maltese association dropped |
 | F-150 | Japan-market story dropped; Australian publishers kept |
 | googledown | Google fails: Bing alone carries the section |
 | downtest | both sources fail: the "Couldn't reach the news sources" message |
+
+`run2.py` also asserts three things added on 27 Nov 2026: plain keywords keep
+their place word, "Wrong topic" blocks a publisher from one topic only (and
+settings can undo it), and the keyword upgrade runs again for data version 6.
 
 Bing's fixture returns nothing for any query containing OR, brackets or quotes,
 as the real feed does. A section that relies on Bing only passes if the app
